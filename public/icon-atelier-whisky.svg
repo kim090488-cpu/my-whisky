@@ -1,0 +1,33 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="180" fill="#EFE3CB"/>
+
+  <!-- Subtle inner frame — the signature element -->
+  <rect x="56" y="56" width="912" height="912" rx="140"
+        fill="none" stroke="#1F1409" stroke-width="4" opacity="0.18"/>
+
+  <!-- Symbol illustration (top) -->
+  
+  <g stroke="#1F1409" stroke-width="14" fill="none"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 408 280 L 408 440 Q 408 460 428 460 L 596 460 Q 616 460 616 440 L 616 280"/>
+    <line x1="408" y1="280" x2="616" y2="280"/>
+    <line x1="428" y1="385" x2="596" y2="385" opacity="0.5"/>
+  </g>
+
+  <!-- "My" italic serif (small, signature) -->
+  <text x="512" y="660"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-style="italic"
+        font-size="92"
+        text-anchor="middle"
+        fill="#7A5A30">My</text>
+
+  <!-- App name (bold, large) -->
+  <text x="512" y="850"
+        font-family="Georgia, 'Times New Roman', 'Malgun Gothic', '맑은 고딕', serif"
+        font-weight="900"
+        font-size="170"
+        text-anchor="middle"
+        fill="#1F1409"
+        letter-spacing="-4">Whisky</text>
+</svg>
