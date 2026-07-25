@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import {
   registerForPushNotifications, setPushEnabled, sendTestPush,
 } from "@/lib/push";
+import { signInWithProvider, type OAuthProvider } from "@/lib/oauth";
 
 export default function MeScreen() {
   const { session, loading } = useSession();
@@ -31,6 +32,7 @@ function LoggedOut() {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [oauthPending, setOauthPending] = useState<OAuthProvider | null>(null);
 
   async function submit() {
     setError(null);
@@ -58,6 +60,21 @@ function LoggedOut() {
     }
   }
 
+  async function oauth(provider: OAuthProvider) {
+    setError(null);
+    setOauthPending(provider);
+    try {
+      const res = await signInWithProvider(provider);
+      if (!res.ok && !("cancelled" in res && res.cancelled)) {
+        setError("error" in res ? res.error : "로그인에 실패했어요.");
+      }
+    } finally {
+      setOauthPending(null);
+    }
+  }
+
+  const busy = pending || oauthPending !== null;
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#0a0a0a" }}
@@ -66,6 +83,42 @@ function LoggedOut() {
       <ScrollView contentContainerStyle={styles.formContainer} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>my-whisky</Text>
         <Text style={styles.formTitle}>{mode === "login" ? "로그인" : "가입"}</Text>
+
+        <Pressable
+          onPress={() => oauth("google")}
+          disabled={busy}
+          style={({ pressed }) => [
+            styles.oauthButton,
+            styles.oauthGoogle,
+            busy && styles.oauthButtonDisabled,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={styles.oauthGoogleText}>
+            {oauthPending === "google" ? "Google로 이동 중…" : "Google로 계속하기"}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => oauth("kakao")}
+          disabled={busy}
+          style={({ pressed }) => [
+            styles.oauthButton,
+            styles.oauthKakao,
+            busy && styles.oauthButtonDisabled,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={styles.oauthKakaoText}>
+            {oauthPending === "kakao" ? "카카오로 이동 중…" : "카카오로 계속하기"}
+          </Text>
+        </Pressable>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>또는 이메일</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         <TextInput
           value={email}
@@ -92,10 +145,10 @@ function LoggedOut() {
 
         <Pressable
           onPress={submit}
-          disabled={pending || !email || !password}
+          disabled={busy || !email || !password}
           style={({ pressed }) => [
             styles.primaryButton,
-            (pending || !email || !password) && styles.primaryButtonDisabled,
+            (busy || !email || !password) && styles.primaryButtonDisabled,
             pressed && { opacity: 0.85 },
           ]}
         >
@@ -381,6 +434,29 @@ const styles = StyleSheet.create({
   primaryButtonDisabled: { opacity: 0.5 },
   primaryButtonText: { color: "#0a0a0a", fontWeight: "600", fontSize: 15 },
   toggleText: { color: "#a3a3a3", textAlign: "center", marginTop: 16, fontSize: 13 },
+  oauthButton: {
+    paddingVertical: 13,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  oauthButtonDisabled: { opacity: 0.5 },
+  oauthGoogle: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d4d4d4",
+  },
+  oauthGoogleText: { color: "#171717", fontWeight: "600", fontSize: 15 },
+  oauthKakao: { backgroundColor: "#FEE500" },
+  oauthKakaoText: { color: "#191919", fontWeight: "600", fontSize: 15 },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 4,
+    gap: 12,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "#262626" },
+  dividerText: { color: "#737373", fontSize: 12 },
 
   // 로그인 상태 (Me)
   meContainer: { padding: 24, paddingTop: 48, alignItems: "center" },

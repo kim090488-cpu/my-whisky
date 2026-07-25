@@ -142,8 +142,10 @@ export default function TastingDetail() {
   }, [id, session]);
 
   async function toggleLike() {
+    console.log("[like] tap. session:", !!session, "t:", !!t, "likePending:", likePending);
     if (!session) {
-      router.push("/login" as never);
+      console.log("[like] no session → me tab");
+      router.push("/(tabs)/me" as never);
       return;
     }
     if (!t || likePending) return;
@@ -159,6 +161,7 @@ export default function TastingDetail() {
         .delete()
         .eq("user_id", session.user.id)
         .eq("tasting_id", t.id);
+      console.log("[like] delete result:", error?.message ?? "ok");
       if (error) {
         setLiked(prev.liked);
         setLikeCount(prev.count);
@@ -167,6 +170,7 @@ export default function TastingDetail() {
       const { error } = await supabase
         .from("tasting_likes")
         .insert({ user_id: session.user.id, tasting_id: t.id });
+      console.log("[like] insert result:", error?.message ?? "ok");
       if (error) {
         setLiked(prev.liked);
         setLikeCount(prev.count);

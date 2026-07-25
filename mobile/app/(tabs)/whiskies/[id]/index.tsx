@@ -15,6 +15,7 @@ import { useSession } from "@/lib/auth-context";
 import { FlavorProfile, type FlavorProfileData } from "./_flavor-profile";
 import { loadBottlingFans, type BottlingFan } from "@/lib/social/bottling-fans";
 import { BottlingFansSection } from "@/components/social/bottling-fans-section";
+import { TastingCard } from "@/components/social/tasting-card";
 
 type Bottling = {
   id: string;
@@ -214,48 +215,15 @@ export default function BottlingDetail() {
       {tastings.length === 0 ? (
         <Text style={styles.empty}>아직 공개 노트가 없어요.</Text>
       ) : (
-        tastings.map((t) => (
-          <View key={t.id} style={styles.tastingCard}>
-            <View style={styles.tastingTopRow}>
-              <Pressable
-                onPress={() => t.profile?.username && router.push(`/profile/${t.profile.username}`)}
-                style={{ flex: 1 }}
-                hitSlop={6}
-              >
-                <Text style={styles.tastingAuthor} numberOfLines={1}>
-                  <Text style={styles.tastingAuthorName}>
-                    {t.profile?.display_name ?? t.profile?.username ?? "익명"}
-                  </Text>
-                  {"  "}
-                  <Text style={styles.tastingDate}>· {t.tasted_at}</Text>
-                  {t.user_id === session?.user.id && (
-                    <Text style={styles.myNoteBadge}>  내 노트</Text>
-                  )}
-                  {t.visibility !== "public" && (
-                    <Text style={styles.visibilityBadge}>
-                      {"  "}{t.visibility === "private" ? "비공개" : "팔로워만"}
-                    </Text>
-                  )}
-                </Text>
-              </Pressable>
-              {t.score !== null && <Text style={styles.tastingScore}>{t.score}</Text>}
-            </View>
-            {t.notes && <Text style={styles.tastingOverall}>{t.notes}</Text>}
-            {t.photos && t.photos.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoStrip}>
-                {t.photos.map((p) => {
-                  const url = tastingPhotoUrl(p);
-                  return url ? (
-                    <Image key={p} source={{ uri: url }} style={styles.tastingPhoto} />
-                  ) : null;
-                })}
-              </ScrollView>
-            )}
-            <Text style={styles.tastingFooter}>
-              ♡ {t.like_count} · 💬 {t.comment_count}
-            </Text>
-          </View>
-        ))
+        <View style={{ gap: 12 }}>
+          {tastings.map((t) => (
+            <TastingCard
+              key={t.id}
+              tasting={t}
+              currentUserId={session?.user.id ?? null}
+            />
+          ))}
+        </View>
       )}
     </ScrollView>
   );
@@ -332,6 +300,7 @@ const styles = StyleSheet.create({
   noteLabel: { color: "#737373" },
   tastingOverall: { color: "#e5e5e5", marginTop: 8, fontSize: 13, lineHeight: 18 },
   tastingFooter: { color: "#525252", fontSize: 11, marginTop: 8 },
+  tastingFooterHint: { color: "#fbbf24" },
   photoStrip: { marginTop: 8 },
   tastingPhoto: {
     width: 100, height: 100, borderRadius: 6, marginRight: 8,

@@ -79,8 +79,10 @@ export function CommentsThread({
   }
 
   async function submit() {
+    console.log("[comment] tap. currentUserId:", currentUserId, "body:", body.length, "submitting:", submitting);
     if (!currentUserId) {
-      router.push("/login" as never);
+      console.log("[comment] no user → me tab");
+      router.push("/(tabs)/me" as never);
       return;
     }
     setError(null);
@@ -100,6 +102,7 @@ export function CommentsThread({
         body: text,
         parent_id: replyTo?.id ?? null,
       });
+    console.log("[comment] insert result:", insertError?.message ?? "ok");
     if (insertError) {
       setError(insertError.message);
       setSubmitting(false);
