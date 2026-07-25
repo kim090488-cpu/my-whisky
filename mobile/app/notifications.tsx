@@ -197,12 +197,15 @@ function NotificationRow({
   const actorName = row.actor?.display_name || row.actor?.username || "누군가";
   const meta = KIND_META[row.kind];
 
+  // 알림 본문은 200자로 잘라 렌더 (스팸 body로 UI 붕괴 방지)
+  const commentBody =
+    typeof row.payload?.body === "string" ? row.payload.body.slice(0, 200) : null;
   const message =
     row.kind === "like"
       ? `${actorName}님이 회원님의 노트를 좋아합니다.`
       : row.kind === "comment"
         ? `${actorName}님이 회원님의 노트에 댓글을 남겼습니다${
-            row.payload?.body ? `: "${row.payload.body}"` : "."
+            commentBody ? `: "${commentBody}"` : "."
           }`
         : `${actorName}님이 회원님을 팔로우했습니다.`;
 

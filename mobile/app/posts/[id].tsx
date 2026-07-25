@@ -9,6 +9,7 @@ import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { postPhotoUrl } from "@/lib/uploads";
 import { COUNTRY_FLAG } from "@/lib/format";
+import { isValidUuid } from "@/lib/params";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 import { PhotoLightbox } from "../tastings/[id]/_photo-lightbox";
 
@@ -92,6 +93,11 @@ export default function PostDetail() {
 
   useEffect(() => {
     if (!id) return;
+    if (!isValidUuid(id)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       setNotFound(false);

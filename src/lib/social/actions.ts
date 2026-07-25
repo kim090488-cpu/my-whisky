@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { rateLimit } from "@/lib/auth/rate-limit";
 
 export async function addTastingComment(formData: FormData) {
   const supabase = await createClient();
@@ -9,6 +10,11 @@ export async function addTastingComment(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
+
+  const limit = rateLimit(`comment:${user.id}`, { max: 20, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
 
   const tastingId = String(formData.get("tasting_id") ?? "");
   const body = String(formData.get("body") ?? "").trim();
@@ -58,6 +64,11 @@ export async function toggleFollow(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
 
+  const limit = rateLimit(`follow:${user.id}`, { max: 30, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
+
   const followeeId = String(formData.get("followee_id") ?? "");
   if (!followeeId) return { error: "followee_id 누락" };
   if (followeeId === user.id) return { error: "자기 자신은 팔로우할 수 없어요." };
@@ -91,6 +102,11 @@ export async function togglePostLike(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
 
+  const limit = rateLimit(`like:${user.id}`, { max: 60, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
+
   const postId = String(formData.get("post_id") ?? "");
   if (!postId) return { error: "post_id 누락" };
 
@@ -122,6 +138,11 @@ export async function addPostComment(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
+
+  const limit = rateLimit(`comment:${user.id}`, { max: 20, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
 
   const postId = String(formData.get("post_id") ?? "");
   const body = String(formData.get("body") ?? "").trim();
@@ -166,6 +187,11 @@ export async function toggleTastingLike(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
+
+  const limit = rateLimit(`like:${user.id}`, { max: 60, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
 
   const tastingId = String(formData.get("tasting_id") ?? "");
   if (!tastingId) return { error: "tasting_id 누락" };

@@ -19,6 +19,10 @@ export async function GET(request: Request) {
   const safe = q.replace(/[%_\\]/g, (m) => `\\${m}`);
 
   const supabase = await createClient();
+  // 유저 열거 방어: users 검색은 로그인 필수. distilleries/bottlings는 unauth OK.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [distilleriesRes, bottlingsRes, usersRes] = await Promise.all([
     supabase
@@ -34,12 +38,14 @@ export async function GET(request: Request) {
       .order("tasting_count", { ascending: false })
       .order("name")
       .limit(limit),
-    supabase
-      .from("profiles")
-      .select("id, username, display_name, avatar_url, follower_count")
-      .or(`username.ilike.%${safe}%,display_name.ilike.%${safe}%`)
-      .order("follower_count", { ascending: false })
-      .limit(limit),
+    user
+      ? supabase
+          .from("profiles")
+          .select("id, username, display_name, avatar_url, follower_count")
+          .or(`username.ilike.%${safe}%,display_name.ilike.%${safe}%`)
+          .order("follower_count", { ascending: false })
+          .limit(limit)
+      : Promise.resolve({ data: [] as never[] }),
   ]);
 
   return NextResponse.json(

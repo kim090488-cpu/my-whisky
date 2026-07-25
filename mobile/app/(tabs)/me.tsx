@@ -204,6 +204,14 @@ function LoggedIn() {
 
   async function signOut() {
     setSigningOut(true);
+    // 이 기기의 푸시 구독 비활성화 (다른 계정으로 로그인 시 이전 계정에 도달 방지)
+    if (session && pushToken) {
+      await supabase
+        .from("push_subscriptions")
+        .update({ enabled: false })
+        .eq("user_id", session.user.id)
+        .eq("expo_push_token", pushToken);
+    }
     await supabase.auth.signOut();
     setSigningOut(false);
   }

@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { COUNTRY_FLAG, formatScore } from "@/lib/format";
+import { isValidUsername } from "@/lib/params";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 import {
   loadTasteDashboard,
@@ -50,6 +51,11 @@ export default function PublicProfile() {
 
   useEffect(() => {
     if (!username) return;
+    if (!isValidUsername(username)) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       const { data: p } = await supabase

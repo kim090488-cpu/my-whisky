@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import type {
   WhiskyCountry, DistilleryStatus, BottlerKind, CaskType,
 } from "@/types/database";
@@ -60,6 +61,12 @@ export async function createDistillery(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
+
+  // 위키 스팸 방지: 1시간에 5개까지
+  const limit = rateLimit(`contrib_distillery:${user.id}`, { max: 5, windowMs: 3_600_000 });
+  if (!limit.ok) {
+    return { error: `증류소는 1시간에 최대 5개까지 등록할 수 있어요. ${Math.ceil(limit.retryAfterMs / 60_000)}분 후 다시 시도해주세요.` };
+  }
 
   const name = String(formData.get("name") ?? "").trim();
   const countryRaw = String(formData.get("country") ?? "");
@@ -132,6 +139,12 @@ export async function createBottling(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
+
+  // 위키 스팸 방지: 1시간에 15개까지
+  const limit = rateLimit(`contrib_bottling:${user.id}`, { max: 15, windowMs: 3_600_000 });
+  if (!limit.ok) {
+    return { error: `보틀링은 1시간에 최대 15개까지 등록할 수 있어요. ${Math.ceil(limit.retryAfterMs / 60_000)}분 후 다시 시도해주세요.` };
+  }
 
   const distilleryIdRaw = String(formData.get("distillery_id") ?? "").trim();
   const distilleryId = distilleryIdRaw.length > 0 ? distilleryIdRaw : null;

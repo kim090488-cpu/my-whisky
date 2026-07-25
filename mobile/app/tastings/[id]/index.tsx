@@ -11,6 +11,7 @@ import {
   formatAge, formatAbv,
 } from "@/lib/format";
 import { bottlingImageUrl, tastingPhotoUrl } from "@/lib/uploads";
+import { isValidUuid } from "@/lib/params";
 import type { WhiskyCountry, CaskType, TastingVisibility } from "@/types/database";
 import { FlavorRadar } from "./_flavor-radar";
 import { CommentsThread } from "./_comments-thread";
@@ -81,6 +82,11 @@ export default function TastingDetail() {
 
   useEffect(() => {
     if (!id) return;
+    if (!isValidUuid(id)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       setNotFound(false);

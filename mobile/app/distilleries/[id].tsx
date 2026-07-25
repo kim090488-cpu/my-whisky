@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import {
   COUNTRY_FLAG, COUNTRY_LABEL, CASK_LABEL, formatAge, formatAbv, formatPrice,
 } from "@/lib/format";
+import { isValidUuid } from "@/lib/params";
 import type { WhiskyCountry, DistilleryStatus, CaskType } from "@/types/database";
 
 type Distillery = {
@@ -50,6 +51,10 @@ export default function DistilleryDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
+    if (!isValidUuid(id)) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       const { data: dist } = await supabase
         .from("distilleries")
@@ -124,7 +129,7 @@ export default function DistilleryDetailScreen() {
                 d.status === "planned" ? "예정" : d.status
               }
             />
-            {d.website && (
+            {d.website && /^https?:\/\//i.test(d.website) && (
               <Pressable onPress={() => Linking.openURL(d.website!)} style={styles.metaBox}>
                 <Text style={styles.metaLabel}>웹사이트</Text>
                 <Text style={styles.metaLink}>↗ 열기</Text>

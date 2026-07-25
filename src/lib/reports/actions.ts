@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getAdminGuard } from "@/lib/admin/guards";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import type { ReportReason, ReportStatus, ReportTarget } from "@/types/database";
 
 const TARGETS: readonly ReportTarget[] = ["tasting", "comment", "user"];
@@ -15,6 +16,11 @@ export async function submitReport(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "로그인이 필요합니다." };
+
+  const limit = rateLimit(`report:${user.id}`, { max: 10, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
 
   const targetRaw = String(formData.get("target_table") ?? "");
   const target_id = String(formData.get("target_id") ?? "").trim();

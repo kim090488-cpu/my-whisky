@@ -97,6 +97,20 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
+  // 웹훅 재시도로 인한 중복 발송 방지: 이미 sent_at이 세팅됐으면 조기 반환
+  const { data: existing } = await supabase
+    .from("notifications")
+    .select("sent_at")
+    .eq("id", notif.id)
+    .maybeSingle();
+
+  if (existing?.sent_at) {
+    return new Response(
+      JSON.stringify({ ok: true, skipped: "already_sent" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // 1. 받는 사람 enabled 토큰
   const { data: subs, error: subsErr } = await supabase
     .from("push_subscriptions")
@@ -146,8 +160,11 @@ Deno.serve(async (req) => {
     });
     expoResult = await expoRes.json();
     if (!expoRes.ok) {
-      await markFailed(supabase, notif.id, `expo ${expoRes.status}: ${JSON.stringify(expoResult)}`);
-      return new Response(JSON.stringify(expoResult), { status: 500 });
+      await markFailed(supabase, notif.id, `expo ${expoRes.status}`);
+      return new Response(
+        JSON.stringify({ error: "expo_send_failed", status: expoRes.status }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
     }
   } catch (e) {
     await markFailed(supabase, notif.id, e instanceof Error ? e.message : String(e));

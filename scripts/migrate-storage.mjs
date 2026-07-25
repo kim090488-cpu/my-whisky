@@ -11,11 +11,12 @@ const env = Object.fromEntries(
     .map(l => [l.split('=')[0], l.split('=').slice(1).join('=')])
 );
 
-const OLD_URL = 'https://wcsrnziyywpnophujaxp.supabase.co';
-const NEW_URL = 'https://tbjzqatfxwubcpexpgrn.supabase.co';
+const OLD_URL = env.OLD_SUPABASE_URL || process.env.OLD_SUPABASE_URL;
+const NEW_URL = env.NEW_SUPABASE_URL || process.env.NEW_SUPABASE_URL;
 const OLD_SVC = env.SUPABASE_SERVICE_ROLE_KEY;
 const NEW_SVC = env.NEW_SUPABASE_SERVICE_ROLE_KEY;
 
+if (!OLD_URL || !NEW_URL) { console.error('Missing OLD_SUPABASE_URL / NEW_SUPABASE_URL in env'); process.exit(1); }
 if (!OLD_SVC || !NEW_SVC) { console.error('Missing service role keys'); process.exit(1); }
 
 async function listObjects(baseUrl, svc, bucket, prefix = '') {
