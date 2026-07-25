@@ -113,6 +113,13 @@ const SYSTEM_PROMPT = `당신은 my-whisky 앱의 전용 위스키 큐레이터�
 - **블렌디드 몰트/스카치**: 여러 증류소·곡물 위스키 혼합
 - **드램(dram)**: 스코틀랜드에서 위스키 한 잔 (30ml 정도)
 
+## 중요: 앱 카탈로그 우선
+
+**두 번째 시스템 블록**에 my-whisky 앱에 등록된 위스키 카탈로그 (인기순 top 100)가 제공됩니다. 답변 시:
+- 카탈로그에 있는 위스키를 **우선 추천**하세요 (탭 시 상세 페이지 이동 가능)
+- 카탈로그에 없는 위스키를 추천할 때는 "저희 앱에는 아직 등록되지 않았지만…"이라고 부드럽게 알림
+- 카탈로그 이름을 정확히 그대로 사용 (예: "맥켈란 12년 셰리 오크" — 임의로 축약 X)
+
 ## 대화 예시 (스타일 참고)
 
 Q: "5만원대 부드러운 위스키 추천"
@@ -176,19 +183,44 @@ export async function POST(request: Request) {
     content: typeof m.content === "string" ? m.content.slice(0, 4000) : "",
   }));
 
+  // 카탈로그 스냅샷 (인기순 top 100) — 두 번째 system block으로 캐싱
+  const { data: catalogRaw } = await supabase
+    .from("bottling_card_stats")
+    .select("name, name_kr, distillery_name, distillery_name_kr, country, cask_type, age_years, abv")
+    .order("tasting_count", { ascending: false, nullsFirst: false })
+    .limit(100);
+  type CatRow = {
+    name: string; name_kr: string | null;
+    distillery_name: string; distillery_name_kr: string | null;
+    country: string; cask_type: string | null;
+    age_years: number | null; abv: number | null;
+  };
+  const catalogRows = (catalogRaw ?? []) as CatRow[];
+  const catalogText = catalogRows.length > 0
+    ? `## my-whisky 앱 카탈로그 (인기순 top ${catalogRows.length})\n\n${catalogRows.map((r, i) => {
+        const kr = r.name_kr ?? r.name;
+        const en = r.name_kr && r.name_kr !== r.name ? ` (${r.name})` : "";
+        const dist = r.distillery_name_kr ?? r.distillery_name;
+        const specs = [
+          r.age_years != null ? `${r.age_years}년` : null,
+          r.abv != null ? `${r.abv}%` : null,
+          r.cask_type ? r.cask_type : null,
+        ].filter(Boolean).join(" · ");
+        return `${i + 1}. ${kr}${en} — ${dist}${specs ? ` · ${specs}` : ""}`;
+      }).join("\n")}`
+    : "## my-whisky 앱 카탈로그\n\n(등록된 위스키 없음)";
+
   const client = new Anthropic({ apiKey });
   try {
     const resp = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 800,
-      // Prompt caching: system은 array of content blocks, 마지막에 cache_control 표시
-      // Haiku 4.5 최소 2048 tokens 초과 → 5분 TTL 캐시. 재요청 시 90% 저렴
+      // Prompt caching: 두 개의 cache_control block
+      //   1. SYSTEM_PROMPT — 거의 정적 (수동 코드 수정 시만 변경)
+      //   2. catalogText — 5분 TTL 안에서 재사용
       system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
+        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+        { type: "text", text: catalogText, cache_control: { type: "ephemeral" } },
       ],
       messages: trimmed,
     });

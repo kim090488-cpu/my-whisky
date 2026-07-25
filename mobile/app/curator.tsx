@@ -5,8 +5,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+
+const STORAGE_KEY_PREFIX = "curator:v1:";
+const MAX_STORED_MESSAGES = 50;
 
 type WhiskyMatch = { id: string; name: string; name_kr: string | null };
 type Message = { role: "user" | "assistant"; content: string; matches?: WhiskyMatch[] };
@@ -24,14 +29,54 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "https://mywhisky-kr.vercel
 export default function CuratorScreen() {
   const router = useRouter();
   const { session } = useSession();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 12);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  const storageKey = session ? `${STORAGE_KEY_PREFIX}${session.user.id}` : null;
+
+  // 대화 히스토리 로드 (유저별 로컬 저장)
+  useEffect(() => {
+    if (!storageKey) { setLoaded(true); return; }
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Message[];
+          if (Array.isArray(parsed)) setMessages(parsed);
+        }
+      } catch { /* ignore parse errors */ }
+      setLoaded(true);
+    })();
+  }, [storageKey]);
+
+  // 대화 히스토리 저장 (최근 50 turn만)
+  useEffect(() => {
+    if (!storageKey || !loaded) return;
+    const toStore = messages.slice(-MAX_STORED_MESSAGES);
+    AsyncStorage.setItem(storageKey, JSON.stringify(toStore)).catch(() => {});
+  }, [messages, storageKey, loaded]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
+
+  function resetChat() {
+    if (messages.length === 0) return;
+    Alert.alert("대화 초기화", "지금까지 나눈 대화를 모두 지울까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "초기화", style: "destructive", onPress: () => {
+          setMessages([]);
+          if (storageKey) AsyncStorage.removeItem(storageKey).catch(() => {});
+        },
+      },
+    ]);
+  }
 
   async function send(promptOverride?: string) {
     if (!session) {
@@ -86,7 +131,16 @@ export default function CuratorScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "#0a0a0a" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Stack.Screen options={{ title: "AI 큐레이터" }} />
+      <Stack.Screen
+        options={{
+          title: "AI 큐레이터",
+          headerRight: () => messages.length > 0 ? (
+            <Pressable onPress={resetChat} hitSlop={8} style={{ paddingRight: 12 }}>
+              <Ionicons name="refresh-outline" size={20} color="#fbbf24" />
+            </Pressable>
+          ) : null,
+        }}
+      />
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
@@ -150,7 +204,7 @@ export default function CuratorScreen() {
           </View>
         )}
       </ScrollView>
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, { paddingBottom: bottomPadding }]}>
         <TextInput
           value={input}
           onChangeText={setInput}
