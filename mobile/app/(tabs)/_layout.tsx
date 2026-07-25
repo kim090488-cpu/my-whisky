@@ -64,6 +64,9 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: BG },
         headerTintColor: "#f5f5f5",
         headerTitleStyle: { fontWeight: "600" },
+        // tab에서 blur될 때 그 tab의 stack을 root로 pop
+        // 다른 tab 갔다 돌아오면 리스트로 복귀 (상세 화면 유지 X)
+        popToTopOnBlur: true,
       }}
     >
       <Tabs.Screen

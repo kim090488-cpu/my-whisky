@@ -180,7 +180,12 @@ export default function CuratorScreen() {
                       {m.matches.map((w) => (
                         <Pressable
                           key={w.id}
-                          onPress={() => router.push(`/whiskies/${w.id}` as never)}
+                          onPress={() => {
+                            // curator에서 상세로 갈 때 tab의 stack이 [index, [id]]로 build되도록 두 단계
+                            router.dismissAll?.();
+                            router.push("/(tabs)/whiskies" as never);
+                            setTimeout(() => router.push(`/(tabs)/whiskies/${w.id}` as never), 50);
+                          }}
                           style={({ pressed }) => [styles.matchChip, pressed && { opacity: 0.7 }]}
                         >
                           <Ionicons name="wine-outline" size={12} color="#fbbf24" />

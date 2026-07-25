@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import {
   COUNTRY_FLAG, CASK_LABEL, BOTTLER_LABEL, formatAge, formatAbv,
@@ -161,7 +162,21 @@ export default function BottlingDetail() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Stack.Screen options={{ title: d?.name ?? "" }} />
+      <Stack.Screen
+        options={{
+          title: d?.name ?? "",
+          // 뒤로가기 항상 노출 (외부 route에서 진입 시에도)
+          headerLeft: () => (
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/whiskies" as never))}
+              hitSlop={8}
+              style={{ paddingLeft: 8, paddingRight: 4 }}
+            >
+              <Ionicons name="chevron-back" size={26} color="#fafafa" />
+            </Pressable>
+          ),
+        }}
+      />
 
       <View style={styles.header}>
         {d && (

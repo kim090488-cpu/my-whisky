@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 export default function CommunityStackLayout() {
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerStyle: { backgroundColor: "#0a0a0a" },
         headerTintColor: "#f5f5f5",
