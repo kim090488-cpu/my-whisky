@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, Image,
   ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -253,7 +254,12 @@ export default function EditTasting() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Stack.Screen options={{ title: "노트 수정" }} />
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={80}
+      >
         {bottlingName && <Text style={styles.subtitle}>{bottlingName}</Text>}
 
         <Field label="점수 (0–100)">
@@ -493,7 +499,7 @@ export default function EditTasting() {
         <Pressable onPress={() => router.back()}>
           <Text style={styles.cancelText}>취소</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

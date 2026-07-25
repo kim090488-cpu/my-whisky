@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, Pressable, TextInput, Modal, StyleSheet, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
@@ -105,6 +106,10 @@ export function ReportButton({
         onRequestClose={close}
         statusBarTranslucent
       >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <Pressable style={styles.backdrop} onPress={close}>
           <Pressable
             style={styles.dialog}
@@ -184,6 +189,7 @@ export function ReportButton({
             </View>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );

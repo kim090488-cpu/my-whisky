@@ -3,12 +3,13 @@ import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image,
   TextInput, Alert, KeyboardAvoidingView, Platform,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { postPhotoUrl } from "@/lib/uploads";
-import { COUNTRY_FLAG } from "@/lib/format";
+import { COUNTRY_FLAG, isEdited } from "@/lib/format";
 import { isValidUuid } from "@/lib/params";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 import { PhotoLightbox } from "../tastings/[id]/_photo-lightbox";
@@ -40,6 +41,7 @@ type Post = {
   like_count: number;
   comment_count: number;
   created_at: string;
+  updated_at: string;
 };
 
 type Comment = {
@@ -105,7 +107,7 @@ export default function PostDetail() {
       const { data: raw } = await supabase
         .from("posts")
         .select(
-          "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at",
+          "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at, updated_at",
         )
         .eq("id", id)
         .maybeSingle();
@@ -264,7 +266,12 @@ export default function PostDetail() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Stack.Screen options={{ title: "모먼트" }} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={80}
+      >
         {/* author header */}
         <View style={styles.header}>
           <Pressable
@@ -283,6 +290,9 @@ export default function PostDetail() {
             </Pressable>
             <View style={styles.metaRow}>
               <Text style={styles.date}>{post.created_at.slice(0, 10)}</Text>
+              {isEdited(post.created_at, post.updated_at) && (
+                <Text style={styles.editedBadge}>수정됨</Text>
+              )}
               {post.visibility !== "public" && (
                 <View style={styles.visibilityPill}>
                   <Ionicons
@@ -297,6 +307,16 @@ export default function PostDetail() {
               )}
             </View>
           </View>
+          {post.user_id === session?.user.id && (
+            <Pressable
+              onPress={() => router.push(`/posts/new?edit=${post.id}` as never)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="create-outline" size={16} color="#fbbf24" />
+              <Text style={styles.editBtnText}>수정</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* photos */}
@@ -464,7 +484,7 @@ export default function PostDetail() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Lightbox */}
       {post.photos.length > 0 && (
@@ -505,6 +525,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
   },
   visibilityText: { color: "#a3a3a3", fontSize: 10 },
+  editedBadge: { color: "#737373", fontSize: 10, fontStyle: "italic" },
+  editBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1, borderColor: "rgba(251,191,36,0.35)",
+    backgroundColor: "rgba(251,191,36,0.06)",
+  },
+  editBtnText: { color: "#fbbf24", fontSize: 11, fontWeight: "600" },
 
   photosBlock: { paddingHorizontal: 16, paddingTop: 12 },
   singlePhoto: {

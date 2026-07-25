@@ -5,6 +5,7 @@ import {
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { tastingPhotoUrl } from "@/lib/uploads";
+import { isEdited } from "@/lib/format";
 import { CommentsThread } from "@/app/tastings/[id]/_comments-thread";
 import type { TastingVisibility } from "@/types/database";
 
@@ -19,6 +20,8 @@ export type TastingCardData = {
   comment_count: number;
   photos: string[] | null;
   profile: { username: string; display_name: string | null } | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type Props = {
@@ -87,6 +90,9 @@ export function TastingCard({ tasting: t, currentUserId }: Props) {
             </Text>
             {"  "}
             <Text style={styles.date}>· {t.tasted_at}</Text>
+            {isEdited(t.created_at, t.updated_at) && (
+              <Text style={styles.editedBadge}>  · 수정됨</Text>
+            )}
             {t.user_id === currentUserId && (
               <Text style={styles.myNoteBadge}>  내 노트</Text>
             )}
@@ -174,6 +180,7 @@ const styles = StyleSheet.create({
   date: { color: "#737373", fontSize: 11 },
   myNoteBadge: { color: "#fbbf24", fontSize: 10 },
   visibilityBadge: { color: "#525252", fontSize: 10 },
+  editedBadge: { color: "#737373", fontSize: 10, fontStyle: "italic" },
   score: { color: "#fbbf24", fontSize: 22, fontWeight: "700", minWidth: 44, textAlign: "right" },
   notes: { color: "#e5e5e5", fontSize: 13, lineHeight: 19, marginTop: 4 },
   photoStrip: { marginTop: 8 },

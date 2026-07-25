@@ -87,7 +87,7 @@ export default function BottlingDetail() {
       const { data: rawT } = await supabase
         .from("tastings")
         .select(
-          "id, tasted_at, score, notes, visibility, user_id, like_count, comment_count, photos",
+          "id, tasted_at, score, notes, visibility, user_id, like_count, comment_count, photos, created_at, updated_at",
         )
         .eq("bottling_id", id)
         .order("tasted_at", { ascending: false })

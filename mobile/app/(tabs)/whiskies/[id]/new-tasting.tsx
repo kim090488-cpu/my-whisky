@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, Image,
   ScrollView, KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -147,7 +148,12 @@ export default function NewTasting() {
       style={{ flex: 1, backgroundColor: "#0a0a0a" }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={80}
+      >
         <Field label="점수 (0–100)">
           <TextInput
             value={score}
@@ -385,7 +391,7 @@ export default function NewTasting() {
         <Pressable onPress={() => router.back()}>
           <Text style={styles.cancelText}>취소</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

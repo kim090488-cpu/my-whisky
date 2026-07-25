@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
@@ -11,6 +12,7 @@ import {
   formatAge, formatAbv,
 } from "@/lib/format";
 import { bottlingImageUrl, tastingPhotoUrl } from "@/lib/uploads";
+import { isEdited } from "@/lib/format";
 import { isValidUuid } from "@/lib/params";
 import type { WhiskyCountry, CaskType, TastingVisibility } from "@/types/database";
 import { FlavorRadar } from "./_flavor-radar";
@@ -31,6 +33,7 @@ type Tasting = {
   like_count: number;
   comment_count: number;
   created_at: string;
+  updated_at: string;
   sweetness: number | null;
   smokiness: number | null;
   fruitiness: number | null;
@@ -94,7 +97,7 @@ export default function TastingDetail() {
       const { data: raw } = await supabase
         .from("tastings")
         .select(
-          "id, tasted_at, score, notes, color, photos, visibility, user_id, bottling_id, like_count, comment_count, created_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length",
+          "id, tasted_at, score, notes, color, photos, visibility, user_id, bottling_id, like_count, comment_count, created_at, updated_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length",
         )
         .eq("id", id)
         .maybeSingle();
@@ -200,7 +203,13 @@ export default function TastingDetail() {
   const bottlingThumb = bottling ? bottlingImageUrl(bottling.label_image_url) : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      extraScrollHeight={80}
+    >
       <Stack.Screen options={{ title: "노트" }} />
 
       {/* 작성자 헤더 */}
@@ -221,6 +230,9 @@ export default function TastingDetail() {
           </Pressable>
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>{t.tasted_at}</Text>
+            {isEdited(t.created_at, t.updated_at) && (
+              <Text style={styles.editedBadge}>수정됨</Text>
+            )}
             {t.visibility !== "public" && (
               <View style={styles.visibilityPill}>
                 <Text style={styles.visibilityText}>
@@ -384,7 +396,7 @@ export default function TastingDetail() {
           onClose={() => setLightboxIndex(null)}
         />
       )}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -409,6 +421,7 @@ const styles = StyleSheet.create({
   authorName: { color: "#fafafa", fontSize: 15, fontWeight: "600" },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
   metaText: { color: "#737373", fontSize: 11 },
+  editedBadge: { color: "#737373", fontSize: 10, fontStyle: "italic" },
   visibilityPill: {
     backgroundColor: "#262626",
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,

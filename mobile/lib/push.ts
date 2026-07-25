@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
 
@@ -16,15 +17,25 @@ Notifications.setNotificationHandler({
 
 export type PushRegisterResult =
   | { ok: true; token: string }
-  | { ok: false; reason: "not_device" | "permission_denied" | "no_project_id" | "error"; message?: string };
+  | { ok: false; reason: "not_device" | "permission_denied" | "no_project_id" | "expo_go_limit" | "error"; message?: string };
 
 /**
  * 권한 요청 + Expo Push Token 발급 + Supabase 저장.
- * Expo Go 에서도 동작 (Expo가 projectId로 발급).
+ * EAS 개발/프로덕션 빌드에서 동작. Expo Go SDK 53+ 에서는 Android remote push 미지원.
  */
 export async function registerForPushNotifications(userId: string): Promise<PushRegisterResult> {
   if (!Device.isDevice) {
     return { ok: false, reason: "not_device", message: "실기기에서만 푸시 알림이 동작해요." };
+  }
+
+  // Expo Go 환경 감지: SDK 53+에서 Android remote push 지원 안 함
+  // ExecutionEnvironment: 'standalone' | 'storeClient' (Expo Go) | 'bare'
+  if (Constants.executionEnvironment === "storeClient") {
+    return {
+      ok: false,
+      reason: "expo_go_limit",
+      message: "Expo Go에서는 실제 푸시 알림을 받을 수 없어요. 정식 앱 빌드가 필요합니다.",
+    };
   }
 
   // Android: 채널 설정 필요

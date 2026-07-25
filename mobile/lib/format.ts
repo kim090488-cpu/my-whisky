@@ -82,3 +82,12 @@ export function formatAbv(abv: number | null): string {
 export function formatScore(score: number | null): string {
   return score === null ? "—" : `${score}점`;
 }
+
+// updated_at이 created_at보다 명확히 늦으면(=5초 초과) 편집된 것으로 판단.
+// 트리거로 생성 직후 updated_at이 밀리초 단위로 살짝 다를 수 있어 안전 마진.
+export function isEdited(createdAt: string | null | undefined, updatedAt: string | null | undefined): boolean {
+  if (!createdAt || !updatedAt) return false;
+  const c = new Date(createdAt).getTime();
+  const u = new Date(updatedAt).getTime();
+  return u - c > 5_000;
+}

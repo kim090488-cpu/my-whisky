@@ -4,11 +4,11 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { postPhotoUrl } from "@/lib/uploads";
-import { COUNTRY_FLAG } from "@/lib/format";
+import { COUNTRY_FLAG, isEdited } from "@/lib/format";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 
 const PAGE_SIZE = 12;
@@ -39,6 +39,7 @@ type Post = {
   like_count: number;
   comment_count: number;
   created_at: string;
+  updated_at: string;
   author: Profile | null;
   bottling: Bottling | null;
   liked: boolean;
@@ -47,17 +48,25 @@ type Post = {
 export default function PostsList() {
   const router = useRouter();
   const { session } = useSession();
+  const { mine } = useLocalSearchParams<{ mine?: string }>();
+  const showMineOnly = mine === "1" && !!session;
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: rawPosts } = await supabase
+    let query = supabase
       .from("posts")
       .select(
-        "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at",
-      )
-      .eq("visibility", "public")
+        "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at, updated_at",
+      );
+    if (showMineOnly && session) {
+      // 내 모먼트만: visibility 무관 (본인은 private/followers 다 볼 수 있음)
+      query = query.eq("user_id", session.user.id);
+    } else {
+      query = query.eq("visibility", "public");
+    }
+    const { data: rawPosts } = await query
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE);
 
@@ -72,6 +81,7 @@ export default function PostsList() {
       like_count: number;
       comment_count: number;
       created_at: string;
+      updated_at: string;
     }>;
 
     if (rows.length === 0) {
@@ -142,7 +152,7 @@ export default function PostsList() {
       })),
     );
     setLoading(false);
-  }, [session]);
+  }, [session, showMineOnly]);
 
   useFocusEffect(
     useCallback(() => {
@@ -159,7 +169,9 @@ export default function PostsList() {
   }
 
   return (
-    <FlatList
+    <>
+      <Stack.Screen options={{ title: showMineOnly ? "내 모먼트" : "모먼트" }} />
+      <FlatList
       style={{ backgroundColor: "#0a0a0a" }}
       data={posts}
       keyExtractor={(p) => p.id}
@@ -177,7 +189,9 @@ export default function PostsList() {
       }
       ListEmptyComponent={
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>아직 공개된 모먼트가 없어요.</Text>
+          <Text style={styles.emptyText}>
+            {showMineOnly ? "아직 작성한 모먼트가 없어요." : "아직 공개된 모먼트가 없어요."}
+          </Text>
         </View>
       }
       refreshControl={
@@ -193,6 +207,7 @@ export default function PostsList() {
       }
       renderItem={({ item: p }) => <PostCard post={p} router={router} />}
     />
+    </>
   );
 }
 
@@ -227,6 +242,9 @@ function PostCard({
           <View style={styles.headerRow}>
             <Text style={styles.author} numberOfLines={1}>{authorName}</Text>
             <Text style={styles.date}>{p.created_at.slice(0, 10)}</Text>
+            {isEdited(p.created_at, p.updated_at) && (
+              <Text style={styles.editedBadge}>수정됨</Text>
+            )}
           </View>
         </View>
       </View>
@@ -326,6 +344,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
   author: { color: "#fafafa", fontSize: 13, fontWeight: "600" },
   date: { color: "#737373", fontSize: 11 },
+  editedBadge: { color: "#737373", fontSize: 10, fontStyle: "italic" },
 
   hero: { width: "100%", height: 240, backgroundColor: "#0a0a0a" },
   photoCountBadge: {

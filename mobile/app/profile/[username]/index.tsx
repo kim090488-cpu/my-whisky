@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Pressable, Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { COUNTRY_FLAG, formatScore } from "@/lib/format";
+import { tastingPhotoUrl } from "@/lib/uploads";
 import { isValidUsername } from "@/lib/params";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 import {
@@ -32,6 +33,7 @@ type Tasting = {
   notes: string | null;
   visibility: TastingVisibility;
   bottling_id: string;
+  photos: string[] | null;
   bottling?: { id: string; name: string; distillery_name: string; country: WhiskyCountry };
 };
 
@@ -69,7 +71,7 @@ export default function PublicProfile() {
       // 노트
       let tQuery = supabase
         .from("tastings")
-        .select("id, tasted_at, score, notes, visibility, bottling_id")
+        .select("id, tasted_at, score, notes, visibility, bottling_id, photos")
         .eq("user_id", p.id)
         .order("tasted_at", { ascending: false })
         .limit(30);
@@ -233,6 +235,16 @@ export default function PublicProfile() {
               {t.score !== null && <Text style={styles.tScore}>{formatScore(t.score)}</Text>}
             </View>
             {t.notes && <Text style={styles.tOverall} numberOfLines={3}>{t.notes}</Text>}
+            {t.photos && t.photos.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbStrip}>
+                {t.photos.map((p) => {
+                  const url = tastingPhotoUrl(p);
+                  return url ? (
+                    <Image key={p} source={{ uri: url }} style={styles.thumb} />
+                  ) : null;
+                })}
+              </ScrollView>
+            )}
             <Text style={styles.tFooter}>
               {t.tasted_at}
               {t.visibility !== "public" && `  · ${t.visibility === "private" ? "비공개" : "팔로워만"}`}
@@ -294,4 +306,6 @@ const styles = StyleSheet.create({
   tScore: { color: "#fbbf24", fontSize: 13, fontWeight: "600" },
   tOverall: { color: "#d4d4d4", fontSize: 13, marginTop: 6, lineHeight: 18 },
   tFooter: { color: "#525252", fontSize: 10, marginTop: 6 },
+  thumbStrip: { marginTop: 8 },
+  thumb: { width: 70, height: 70, borderRadius: 6, marginRight: 6, backgroundColor: "#262626" },
 });
