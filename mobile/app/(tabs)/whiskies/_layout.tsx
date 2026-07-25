@@ -18,9 +18,16 @@ export default function WhiskiesStackLayout() {
         options={{ title: "테이스팅 작성", presentation: "modal" }}
       />
       <Stack.Screen
+        name="[id]/edit"
+        options={{ title: "위스키 정보 수정", presentation: "modal" }}
+      />
+      <Stack.Screen name="[id]/history" options={{ title: "수정 이력" }} />
+      <Stack.Screen
         name="scan"
         options={{ title: "바코드 스캔", presentation: "modal" }}
       />
+      <Stack.Screen name="new" options={{ title: "새 위스키 등록", presentation: "modal" }} />
+      <Stack.Screen name="compare" options={{ title: "위스키 비교" }} />
     </Stack>
   );
 }

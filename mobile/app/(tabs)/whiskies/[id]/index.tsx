@@ -16,6 +16,7 @@ import { FlavorProfile, type FlavorProfileData } from "./_flavor-profile";
 import { loadBottlingFans, type BottlingFan } from "@/lib/social/bottling-fans";
 import { BottlingFansSection } from "@/components/social/bottling-fans-section";
 import { TastingCard } from "@/components/social/tasting-card";
+import { CollectionPicker } from "@/components/whisky/collection-picker";
 
 type Bottling = {
   id: string;
@@ -180,6 +181,8 @@ export default function BottlingDetail() {
         )}
       </View>
 
+      <CollectionPicker bottlingId={b.id} />
+
       <View style={styles.statsGrid}>
         <Stat label="숙성" value={formatAge(b.age_years)} />
         <Stat label="ABV" value={formatAbv(b.abv)} />
@@ -195,6 +198,23 @@ export default function BottlingDetail() {
       </View>
 
       {b.notes && <Text style={styles.bottlingNotes}>{b.notes}</Text>}
+
+      <View style={styles.editLinkGroup}>
+        {session && (
+          <Pressable
+            onPress={() => router.push(`/(tabs)/whiskies/${b.id}/edit` as never)}
+            style={({ pressed }) => [styles.editLinkRow, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.editLinkText}>정보 수정 (누구나 편집 가능)</Text>
+          </Pressable>
+        )}
+        <Pressable
+          onPress={() => router.push(`/(tabs)/whiskies/${b.id}/history` as never)}
+          style={({ pressed }) => [styles.editLinkRow, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.editLinkText}>수정 이력 · 추천</Text>
+        </Pressable>
+      </View>
 
       {verdict && verdict.total_reviews > 0 && <FlavorProfile data={verdict} />}
 
@@ -272,6 +292,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: "#171717", marginTop: 8,
   },
   sectionTitle: { color: "#fafafa", fontSize: 16, fontWeight: "600" },
+  editLinkGroup: { flexDirection: "row", justifyContent: "center", gap: 16, marginTop: 4 },
+  editLinkRow: { paddingHorizontal: 8, paddingVertical: 8 },
+  editLinkText: { color: "#a3a3a3", fontSize: 12, fontStyle: "italic" },
   writeButton: {
     backgroundColor: "#fbbf24",
     paddingHorizontal: 14, paddingVertical: 7,

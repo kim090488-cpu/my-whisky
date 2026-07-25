@@ -11,9 +11,11 @@ import type { WhiskyCountry } from "@/types/database";
 type Bottling = {
   id: string;
   name: string;
+  name_kr: string | null;
   age_years: number | null;
   abv: number | null;
   distillery_name: string;
+  distillery_name_kr: string | null;
   country: WhiskyCountry;
   region: string | null;
   avg_score: number | null;
@@ -22,7 +24,7 @@ type Bottling = {
 
 const PAGE = 24;
 const SELECT =
-  "id, name, age_years, abv, distillery_name, country, region, avg_score, tasting_count";
+  "id, name, name_kr, age_years, abv, distillery_name, distillery_name_kr, country, region, avg_score, tasting_count";
 
 export default function WhiskiesIndex() {
   const router = useRouter();
@@ -39,18 +41,19 @@ export default function WhiskiesIndex() {
       // 검색어 있을 때: 보틀링 이름 + 증류소 이름 2개 쿼리 후 dedupe
       // (한 번에 최대 100개 — 페이지네이션은 검색 모드에선 비활성)
       if (t) {
-        const pattern = `%${t}%`;
+        const safe = t.replace(/[%_\\]/g, (m) => `\\${m}`);
+        const pattern = `%${safe}%`;
         const [byName, byDist] = await Promise.all([
           supabase
             .from("bottling_card_stats")
             .select(SELECT)
-            .ilike("name", pattern)
+            .or(`name.ilike.${pattern},name_kr.ilike.${pattern}`)
             .order("name")
             .limit(50),
           supabase
             .from("bottling_card_stats")
             .select(SELECT)
-            .ilike("distillery_name", pattern)
+            .or(`distillery_name.ilike.${pattern},distillery_name_kr.ilike.${pattern}`)
             .order("name")
             .limit(50),
         ]);
@@ -127,6 +130,18 @@ export default function WhiskiesIndex() {
           style={styles.searchInput}
         />
         <Pressable
+          onPress={() => router.push("/whiskies/compare" as never)}
+          style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.scanBtnText}>⚖</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push("/(tabs)/whiskies/new" as never)}
+          style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.scanBtnText}>+</Text>
+        </Pressable>
+        <Pressable
           onPress={() => router.push("/whiskies/scan")}
           style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
         >
@@ -144,7 +159,7 @@ export default function WhiskiesIndex() {
           >
             <View style={styles.cardTopRow}>
               <Text style={styles.cardDist} numberOfLines={1}>
-                {COUNTRY_FLAG[item.country]} {item.distillery_name}
+                {COUNTRY_FLAG[item.country]} {item.distillery_name_kr ?? item.distillery_name}
                 {item.region ? ` · ${item.region}` : ""}
               </Text>
               {item.avg_score !== null ? (
@@ -156,7 +171,7 @@ export default function WhiskiesIndex() {
                 <Text style={styles.noNote}>노트 없음</Text>
               )}
             </View>
-            <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+            <Text style={styles.cardName} numberOfLines={2}>{item.name_kr ?? item.name}</Text>
             <Text style={styles.cardMeta}>
               {formatAge(item.age_years)} · {formatAbv(item.abv)}
             </Text>

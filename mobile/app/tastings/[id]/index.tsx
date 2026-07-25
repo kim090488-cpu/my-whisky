@@ -34,6 +34,7 @@ type Tasting = {
   comment_count: number;
   created_at: string;
   updated_at: string;
+  tags: string[] | null;
   sweetness: number | null;
   smokiness: number | null;
   fruitiness: number | null;
@@ -97,7 +98,7 @@ export default function TastingDetail() {
       const { data: raw } = await supabase
         .from("tastings")
         .select(
-          "id, tasted_at, score, notes, color, photos, visibility, user_id, bottling_id, like_count, comment_count, created_at, updated_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length",
+          "id, tasted_at, score, notes, color, photos, visibility, user_id, bottling_id, like_count, comment_count, created_at, updated_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, tags",
         )
         .eq("id", id)
         .maybeSingle();
@@ -322,6 +323,16 @@ export default function TastingDetail() {
           <Text style={styles.muted}>본문 없는 노트.</Text>
         )}
 
+        {t.tags && t.tags.length > 0 && (
+          <View style={styles.tagRow}>
+            {t.tags.map((tag) => (
+              <View key={tag} style={styles.tagChip}>
+                <Text style={styles.tagChipText}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {t.photos && t.photos.length > 0 && (
           <View style={styles.photoGrid}>
             {t.photos.map((path, i) => {
@@ -468,6 +479,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 20, gap: 16,
   },
   block: { gap: 4 },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
+  tagChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: "rgba(251, 191, 36, 0.1)", borderWidth: 1, borderColor: "rgba(251, 191, 36, 0.35)" },
+  tagChipText: { color: "#fbbf24", fontSize: 12, fontWeight: "500" },
   blockLabel: {
     color: "#737373", fontSize: 10, fontWeight: "600",
     textTransform: "uppercase", letterSpacing: 0.5,

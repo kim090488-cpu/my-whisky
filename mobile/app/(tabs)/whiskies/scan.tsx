@@ -41,12 +41,14 @@ export default function ScanScreen() {
     lastCodeRef.current = data;
     setScanning(false);
     setLookup(true);
+    console.log("[scan] barcode scanned:", data, "length:", data.length);
 
-    const { data: bottling } = await supabase
+    const { data: bottling, error: lookupError } = await supabase
       .from("bottlings")
-      .select("id, name")
+      .select("id, name, barcode")
       .eq("barcode", data)
       .maybeSingle();
+    console.log("[scan] lookup result:", bottling ? `found id=${bottling.id} barcode=${bottling.barcode}` : "not found", "error:", lookupError?.message ?? "none");
 
     setLookup(false);
 
@@ -56,11 +58,14 @@ export default function ScanScreen() {
     }
 
     Alert.alert(
-      "찾을 수 없어요",
-      `바코드: ${data}\n이 보틀링은 아직 등록돼 있지 않아요.`,
+      "미등록 위스키",
+      `바코드: ${data}\n등록되지 않은 위스키예요. 지금 등록해서 태그할 수 있어요.`,
       [
         { text: "다시 스캔", onPress: () => { lastCodeRef.current = null; setScanning(true); } },
-        { text: "닫기", onPress: () => router.back(), style: "cancel" },
+        {
+          text: "등록하기",
+          onPress: () => router.replace(`/(tabs)/whiskies/new?barcode=${encodeURIComponent(data)}` as never),
+        },
       ],
     );
   }

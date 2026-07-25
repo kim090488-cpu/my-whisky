@@ -14,6 +14,7 @@ import {
   type TasteDashboard,
 } from "@/lib/tastings/taste-profile";
 import { TasteDashboardCard } from "@/components/social/taste-dashboard-card";
+import { BadgeRow } from "@/components/badges/badge-row";
 
 type Profile = {
   id: string;
@@ -46,6 +47,8 @@ export default function PublicProfile() {
   const [tastings, setTastings] = useState<Tasting[]>([]);
   const [dashboard, setDashboard] = useState<TasteDashboard | null>(null);
   const [following, setFollowing] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockPending, setBlockPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [followPending, setFollowPending] = useState(false);
 
@@ -96,6 +99,16 @@ export default function PublicProfile() {
         })),
       );
 
+      // 차단 여부
+      if (session && session.user.id !== p.id) {
+        const { data: bk } = await supabase
+          .from("user_blocks")
+          .select("id")
+          .eq("blocker_id", session.user.id)
+          .eq("blocked_id", p.id)
+          .maybeSingle();
+        setBlocked(!!bk);
+      }
       // 팔로우 여부
       if (session && session.user.id !== p.id) {
         const { data: fol } = await supabase
@@ -116,6 +129,32 @@ export default function PublicProfile() {
       setLoading(false);
     })();
   }, [username, session]);
+
+  async function toggleBlock() {
+    if (!session || !profile || blockPending) return;
+    setBlockPending(true);
+    const prev = blocked;
+    if (prev) {
+      const { error } = await supabase
+        .from("user_blocks")
+        .delete()
+        .eq("blocker_id", session.user.id)
+        .eq("blocked_id", profile.id);
+      if (!error) setBlocked(false);
+    } else {
+      // 차단 시 팔로우 관계도 해제
+      await supabase.from("follows").delete()
+        .or(`and(follower_id.eq.${session.user.id},followee_id.eq.${profile.id}),and(follower_id.eq.${profile.id},followee_id.eq.${session.user.id})`);
+      const { error } = await supabase
+        .from("user_blocks")
+        .insert({ blocker_id: session.user.id, blocked_id: profile.id });
+      if (!error) {
+        setBlocked(true);
+        setFollowing(false);
+      }
+    }
+    setBlockPending(false);
+  }
 
   async function toggleFollow() {
     if (!session || !profile) return;
@@ -185,25 +224,43 @@ export default function PublicProfile() {
             </Pressable>
           </View>
           {!isSelf && session && (
-            <Pressable
-              onPress={toggleFollow}
-              disabled={followPending}
-              style={({ pressed }) => [
-                styles.followBtn,
-                following && styles.followBtnActive,
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
-                {following ? "팔로잉" : "+ 팔로우"}
-              </Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
+              <Pressable
+                onPress={toggleFollow}
+                disabled={followPending || blocked}
+                style={({ pressed }) => [
+                  styles.followBtn,
+                  following && styles.followBtnActive,
+                  blocked && { opacity: 0.4 },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
+                  {following ? "팔로잉" : "+ 팔로우"}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={toggleBlock}
+                disabled={blockPending}
+                style={({ pressed }) => [
+                  styles.blockBtn,
+                  blocked && styles.blockBtnActive,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={[styles.blockBtnText, blocked && styles.blockBtnTextActive]}>
+                  {blocked ? "차단됨" : "차단"}
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </View>
 
       {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
       <Text style={styles.joined}>{joinedMonth} 가입</Text>
+
+      <BadgeRow userId={profile.id} />
 
       {dashboard && <TasteDashboardCard dashboard={dashboard} isSelf={!!isSelf} />}
 
@@ -281,6 +338,14 @@ const styles = StyleSheet.create({
     borderRadius: 6, alignSelf: "flex-start",
   },
   followBtnActive: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#404040" },
+  blockBtn: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+    borderWidth: 1, borderColor: "#404040", backgroundColor: "transparent",
+    alignItems: "center",
+  },
+  blockBtnActive: { borderColor: "#f43f5e", backgroundColor: "rgba(244, 63, 94, 0.08)" },
+  blockBtnText: { color: "#a3a3a3", fontSize: 12, fontWeight: "600" },
+  blockBtnTextActive: { color: "#f43f5e" },
   followBtnText: { color: "#0a0a0a", fontWeight: "600", fontSize: 12 },
   followBtnTextActive: { color: "#a3a3a3" },
 

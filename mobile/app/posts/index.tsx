@@ -53,6 +53,7 @@ export default function PostsList() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [visibilityFilter, setVisibilityFilter] = useState<"all" | TastingVisibility>("all");
 
   const load = useCallback(async () => {
     let query = supabase
@@ -63,6 +64,9 @@ export default function PostsList() {
     if (showMineOnly && session) {
       // 내 모먼트만: visibility 무관 (본인은 private/followers 다 볼 수 있음)
       query = query.eq("user_id", session.user.id);
+      if (visibilityFilter !== "all") {
+        query = query.eq("visibility", visibilityFilter);
+      }
     } else {
       query = query.eq("visibility", "public");
     }
@@ -152,7 +156,7 @@ export default function PostsList() {
       })),
     );
     setLoading(false);
-  }, [session, showMineOnly]);
+  }, [session, showMineOnly, visibilityFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,15 +181,36 @@ export default function PostsList() {
       keyExtractor={(p) => p.id}
       contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: 24 }}
       ListHeaderComponent={
-        session ? (
-          <Pressable
-            onPress={() => router.push("/posts/new" as never)}
-            style={({ pressed }) => [styles.newBtn, pressed && { opacity: 0.85 }]}
-          >
-            <Ionicons name="add" size={18} color="#0a0a0a" />
-            <Text style={styles.newBtnText}>모먼트 남기기</Text>
-          </Pressable>
-        ) : null
+        <View style={{ gap: 10 }}>
+          {showMineOnly && (
+            <View style={styles.filterRow}>
+              {(["all", "public", "followers", "private"] as const).map((v) => (
+                <Pressable
+                  key={v}
+                  onPress={() => setVisibilityFilter(v)}
+                  style={({ pressed }) => [
+                    styles.filterPill,
+                    visibilityFilter === v && styles.filterPillActive,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text style={[styles.filterText, visibilityFilter === v && styles.filterTextActive]}>
+                    {v === "all" ? "전체" : v === "public" ? "공개" : v === "followers" ? "팔로워만" : "비공개"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {session && (
+            <Pressable
+              onPress={() => router.push("/posts/new" as never)}
+              style={({ pressed }) => [styles.newBtn, pressed && { opacity: 0.85 }]}
+            >
+              <Ionicons name="add" size={18} color="#0a0a0a" />
+              <Text style={styles.newBtnText}>모먼트 남기기</Text>
+            </Pressable>
+          )}
+        </View>
       }
       ListEmptyComponent={
         <View style={styles.emptyBox}>
@@ -320,6 +345,11 @@ const styles = StyleSheet.create({
   },
   emptyText: { color: "#737373", fontSize: 13 },
 
+  filterRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  filterPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: "#262626", backgroundColor: "#171717" },
+  filterPillActive: { borderColor: "#fbbf24", backgroundColor: "rgba(251, 191, 36, 0.1)" },
+  filterText: { color: "#a3a3a3", fontSize: 11 },
+  filterTextActive: { color: "#fbbf24", fontWeight: "600" },
   newBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     backgroundColor: "#fbbf24",

@@ -122,7 +122,15 @@ export default function HomeScreen() {
   const [myRecent, setMyRecent] = useState<MyRecentNote[]>([]);
   const [followNotes, setFollowNotes] = useState<FollowNote[]>([]);
   const [likedNotes, setLikedNotes] = useState<FollowNote[]>([]);
-  const [communityNotes, setCommunityNotes] = useState<FollowNote[]>([]);
+  const [communityPosts, setCommunityPosts] = useState<Array<{
+    id: string;
+    category: "question" | "recommendation" | "tip" | "free";
+    title: string;
+    like_count: number;
+    comment_count: number;
+    created_at: string;
+    author: { username: string; display_name: string | null } | null;
+  }>>([]);
   const [recommendedReviewers, setRecommendedReviewers] = useState<FollowRecommendation[]>([]);
   const [monthStats, setMonthStats] = useState<MonthStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -365,63 +373,32 @@ export default function HomeScreen() {
       setLikedNotes([]);
     }
 
-    // 커뮤니티 최근 노트 — 모든 유저의 최근 공개 노트
-    const { data: rawCommRows } = await supabase
-      .from("tastings")
-      .select("id, tasted_at, score, user_id, bottling_id")
-      .eq("visibility", "public")
-      .order("tasted_at", { ascending: false })
-      .limit(MY_RECENT_COUNT);
-    const commRows = (rawCommRows ?? []) as Array<{
-      id: string;
-      tasted_at: string;
-      score: number | null;
-      user_id: string;
-      bottling_id: string;
+    // 커뮤니티 게시판 최신글
+    const { data: rawCommPosts } = await supabase
+      .from("community_posts")
+      .select("id, category, title, like_count, comment_count, created_at, user_id")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    const cpRows = (rawCommPosts ?? []) as Array<{
+      id: string; category: "question" | "recommendation" | "tip" | "free";
+      title: string; like_count: number; comment_count: number; created_at: string; user_id: string;
     }>;
-    if (commRows.length === 0) {
-      setCommunityNotes([]);
+    if (cpRows.length === 0) {
+      setCommunityPosts([]);
     } else {
-      const uIds = Array.from(new Set(commRows.map((r) => r.user_id)));
-      const bIds = Array.from(new Set(commRows.map((r) => r.bottling_id)));
-      const [pRes, bRes] = await Promise.all([
-        supabase.from("profiles").select("id, username, display_name").in("id", uIds),
-        supabase
-          .from("bottling_card_stats")
-          .select("id, name, name_kr, distillery_name, distillery_name_kr, country")
-          .in("id", bIds),
-      ]);
+      const uIds = Array.from(new Set(cpRows.map((r) => r.user_id)));
+      const { data: pRes } = await supabase
+        .from("profiles")
+        .select("id, username, display_name")
+        .in("id", uIds);
       const pById = new Map(
-        ((pRes.data ?? []) as Array<{ id: string; username: string; display_name: string | null }>).map(
-          (p) => [p.id, p],
-        ),
+        ((pRes ?? []) as Array<{ id: string; username: string; display_name: string | null }>).map((p) => [p.id, p]),
       );
-      const bById = new Map<string, FollowNote["bottling"]>();
-      for (const row of (bRes.data ?? []) as Array<{
-        id: string | null;
-        name: string;
-        name_kr: string | null;
-        distillery_name: string;
-        distillery_name_kr: string | null;
-        country: WhiskyCountry;
-      }>) {
-        if (row.id) {
-          bById.set(row.id, {
-            id: row.id, name: row.name, name_kr: row.name_kr,
-            distillery_name: row.distillery_name, distillery_name_kr: row.distillery_name_kr,
-            country: row.country,
-          });
-        }
-      }
-      setCommunityNotes(
-        commRows.map((r) => ({
-          id: r.id,
-          tasted_at: r.tasted_at,
-          score: r.score,
-          bottling: bById.get(r.bottling_id) ?? null,
-          author: pById.get(r.user_id) ?? null,
-        })),
-      );
+      setCommunityPosts(cpRows.map((r) => ({
+        id: r.id, category: r.category, title: r.title,
+        like_count: r.like_count, comment_count: r.comment_count, created_at: r.created_at,
+        author: pById.get(r.user_id) ?? null,
+      })));
     }
 
     // 최근 좋아요한 노트 (로그인 시)
@@ -734,45 +711,60 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* 커뮤니티 최근 노트 */}
-      {communityNotes.length > 0 && (
-        <View style={styles.recommend}>
-          <View style={styles.recommendHead}>
-            <Text style={styles.recommendTitle}>지금 커뮤니티</Text>
-            <Pressable onPress={() => router.push("/tastings")} hitSlop={6}>
-              <Text style={styles.recommendMore}>모두 보기 →</Text>
-            </Pressable>
-          </View>
-          <View style={styles.bottleGrid}>
-            {communityNotes.map((n) =>
-              n.bottling ? (
-                <Pressable
-                  key={n.id}
-                  onPress={() => router.push(`/tastings/${n.id}`)}
-                  style={({ pressed }) => [styles.bottleCard, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={styles.followAuthor} numberOfLines={1}>
-                    {n.author?.display_name ?? n.author?.username ?? "익명"}
-                  </Text>
-                  <Text style={styles.bottleName} numberOfLines={2}>
-                    {n.bottling.name_kr ?? n.bottling.name}
-                  </Text>
-                  <Text style={styles.bottleDist} numberOfLines={1}>
-                    {COUNTRY_FLAG[n.bottling.country]}{" "}
-                    {n.bottling.distillery_name_kr ?? n.bottling.distillery_name}
-                  </Text>
-                  {n.score !== null && (
-                    <View style={styles.bottleScore}>
-                      <Text style={styles.bottleScoreText}>{n.score}</Text>
-                      <Text style={styles.bottleScoreCount}>{n.tasted_at}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              ) : null,
+      {/* 커뮤니티 게시판 최신글 */}
+      <View style={styles.recommend}>
+        <View style={styles.recommendHead}>
+          <Text style={styles.recommendTitle}>커뮤니티 게시판</Text>
+          <Pressable onPress={() => router.push("/community" as never)} hitSlop={6}>
+            <Text style={styles.recommendMore}>모두 보기 →</Text>
+          </Pressable>
+        </View>
+        {communityPosts.length === 0 ? (
+          <View style={styles.communityEmpty}>
+            <Text style={styles.communityEmptyText}>아직 게시글이 없어요.</Text>
+            {session && (
+              <Pressable onPress={() => router.push("/community/new" as never)}>
+                <Text style={styles.recommendMore}>+ 첫 게시글 작성</Text>
+              </Pressable>
             )}
           </View>
-        </View>
-      )}
+        ) : (
+          <View style={{ gap: 8 }}>
+            {communityPosts.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => router.push(`/community/${p.id}` as never)}
+                style={({ pressed }) => [styles.communityRow, pressed && { opacity: 0.7 }]}
+              >
+                <View style={styles.communityRowHead}>
+                  <View style={[
+                    styles.communityCatBadge,
+                    p.category === "question" && { backgroundColor: "rgba(59, 130, 246, 0.15)" },
+                    p.category === "recommendation" && { backgroundColor: "rgba(251, 191, 36, 0.15)" },
+                    p.category === "tip" && { backgroundColor: "rgba(16, 185, 129, 0.15)" },
+                    p.category === "free" && { backgroundColor: "rgba(163, 163, 163, 0.15)" },
+                  ]}>
+                    <Text style={[
+                      styles.communityCatText,
+                      p.category === "question" && { color: "#93c5fd" },
+                      p.category === "recommendation" && { color: "#fde68a" },
+                      p.category === "tip" && { color: "#6ee7b7" },
+                      p.category === "free" && { color: "#d4d4d4" },
+                    ]}>
+                      {p.category === "question" ? "질문" : p.category === "recommendation" ? "추천" : p.category === "tip" ? "팁" : "잡담"}
+                    </Text>
+                  </View>
+                  <Text style={styles.communityAuthor} numberOfLines={1}>
+                    {p.author?.display_name ?? p.author?.username ?? "익명"}
+                  </Text>
+                  <Text style={styles.communityMetric}>♡ {p.like_count} · 💬 {p.comment_count}</Text>
+                </View>
+                <Text style={styles.communityTitle} numberOfLines={1}>{p.title}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
 
       {/* 추천 리뷰어 (로그인 · taste-profile 유사도 기반) */}
       {session && recommendedReviewers.length > 0 && (
@@ -1078,6 +1070,15 @@ const styles = StyleSheet.create({
   recommendHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   recommendTitle: { color: "#fafafa", fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
   recommendMore: { color: "#737373", fontSize: 12 },
+  communityEmpty: { padding: 20, alignItems: "center", gap: 8, backgroundColor: "#111", borderRadius: 10, borderWidth: 1, borderColor: "#262626" },
+  communityEmptyText: { color: "#737373", fontSize: 12 },
+  communityRow: { padding: 12, backgroundColor: "#111", borderWidth: 1, borderColor: "#262626", borderRadius: 10, gap: 6 },
+  communityRowHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  communityCatBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  communityCatText: { fontSize: 10, fontWeight: "700" },
+  communityAuthor: { color: "#a3a3a3", fontSize: 11, flex: 1 },
+  communityMetric: { color: "#737373", fontSize: 10 },
+  communityTitle: { color: "#fafafa", fontSize: 13, fontWeight: "500" },
   recommendSub: { color: "#525252", fontSize: 11, marginTop: 4 },
 
   bottleGrid: {

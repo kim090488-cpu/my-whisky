@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import {
   pickAndUploadTastingPhoto, deleteTastingPhoto, tastingPhotoUrl,
 } from "@/lib/uploads";
+import { TagInput } from "@/components/tag-input";
 import type { TastingVisibility } from "@/types/database";
 
 type RecommendedKind = "beginner" | "intermediate" | "expert" | "gift";
@@ -66,6 +67,8 @@ export default function NewTasting() {
   const [wouldBuyAgain, setWouldBuyAgain] = useState<boolean | null>(null);
   const [valueForMoney, setValueForMoney] = useState<number | null>(null);
   const [recommendedFor, setRecommendedFor] = useState<RecommendedKind[]>([]);
+
+  const [tags, setTags] = useState<string[]>([]);
 
   async function addPhoto() {
     if (photos.length >= MAX_PHOTOS) return;
@@ -133,6 +136,7 @@ export default function NewTasting() {
       would_buy_again: wouldBuyAgain,
       value_for_money: valueForMoney,
       recommended_for: recommendedFor.length > 0 ? recommendedFor : null,
+      tags,
     } as never);
     setPending(false);
 
@@ -164,6 +168,10 @@ export default function NewTasting() {
             placeholderTextColor="#525252"
             style={styles.input}
           />
+        </Field>
+
+        <Field label="태그 (선택)">
+          <TagInput value={tags} onChange={setTags} />
         </Field>
 
         <Field label="공개 범위">

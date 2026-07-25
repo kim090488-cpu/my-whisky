@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import {
   pickAndUploadTastingPhoto, deleteTastingPhoto, tastingPhotoUrl,
 } from "@/lib/uploads";
+import { TagInput } from "@/components/tag-input";
 import type { TastingVisibility } from "@/types/database";
 
 type RecommendedKind = "beginner" | "intermediate" | "expert" | "gift";
@@ -65,6 +66,7 @@ export default function EditTasting() {
   const [wouldBuyAgain, setWouldBuyAgain] = useState<boolean | null>(null);
   const [valueForMoney, setValueForMoney] = useState<number | null>(null);
   const [recommendedFor, setRecommendedFor] = useState<RecommendedKind[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (!id || !session) return;
@@ -76,7 +78,7 @@ export default function EditTasting() {
           "id, user_id, bottling_id, score, notes, color, visibility, photos, " +
             "sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, " +
             "purchase_price, purchase_currency, purchased_at_place, food_pairing, " +
-            "would_buy_again, value_for_money, recommended_for",
+            "would_buy_again, value_for_money, recommended_for, tags",
         )
         .eq("id", id)
         .maybeSingle();
@@ -106,6 +108,7 @@ export default function EditTasting() {
         would_buy_again: boolean | null;
         value_for_money: number | null;
         recommended_for: RecommendedKind[] | null;
+        tags: string[] | null;
       };
       if (row.user_id !== session.user.id) {
         setForbidden(true);
@@ -136,6 +139,7 @@ export default function EditTasting() {
       setWouldBuyAgain(row.would_buy_again);
       setValueForMoney(row.value_for_money);
       setRecommendedFor(row.recommended_for ?? []);
+      setTags(row.tags ?? []);
 
       const { data: b } = await supabase
         .from("bottlings")
@@ -206,6 +210,7 @@ export default function EditTasting() {
         would_buy_again: wouldBuyAgain,
         value_for_money: valueForMoney,
         recommended_for: recommendedFor.length > 0 ? recommendedFor : null,
+        tags,
       } as never)
       .eq("id", id)
       .eq("user_id", session.user.id);
@@ -272,6 +277,10 @@ export default function EditTasting() {
             placeholderTextColor="#525252"
             style={styles.input}
           />
+        </Field>
+
+        <Field label="태그 (선택)">
+          <TagInput value={tags} onChange={setTags} />
         </Field>
 
         <Field label="공개 범위">

@@ -82,9 +82,13 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="collection"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="community"
         options={{
-          title: "컬렉션",
-          tabBarIcon: ({ color }) => <Ionicons name="bookmark-outline" color={color} size={22} />,
+          title: "커뮤니티",
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubbles-outline" color={color} size={22} />,
         }}
       />
       <Tabs.Screen

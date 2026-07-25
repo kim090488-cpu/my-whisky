@@ -343,6 +343,12 @@ function LoggedIn() {
         />
         <MenuDivider />
         <MenuItem
+          icon="sparkles-outline"
+          label="AI 큐레이터"
+          onPress={() => router.push("/curator" as never)}
+        />
+        <MenuDivider />
+        <MenuItem
           icon="notifications-outline"
           label="알림"
           onPress={() => router.push("/notifications")}

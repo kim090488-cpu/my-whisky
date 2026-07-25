@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, Image, Alert,
-  ScrollView, KeyboardAvoidingView, Platform,
+  ScrollView, KeyboardAvoidingView, Platform, BackHandler,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,7 @@ import {
   pickAndUploadPostPhoto, deletePostPhoto, postPhotoUrl,
 } from "@/lib/uploads";
 import { COUNTRY_FLAG } from "@/lib/format";
+import { TagInput } from "@/components/tag-input";
 import type { TastingVisibility, WhiskyCountry } from "@/types/database";
 
 const MAX_PHOTOS = 10;
@@ -41,6 +42,7 @@ export default function NewPost() {
   const [body, setBody] = useState("");
   const [visibility, setVisibility] = useState<TastingVisibility>("public");
   const [locationName, setLocationName] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [bottling, setBottling] = useState<PrefillBottling | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [pending, setPending] = useState(false);
@@ -58,13 +60,14 @@ export default function NewPost() {
     (async () => {
       const { data } = await supabase
         .from("posts")
-        .select("id, user_id, body, photos, visibility, bottling_id, location_name")
+        .select("id, user_id, body, photos, visibility, bottling_id, location_name, tags")
         .eq("id", editId)
         .maybeSingle();
       const p = data as unknown as {
         id: string; user_id: string; body: string | null;
         photos: string[]; visibility: TastingVisibility;
         bottling_id: string | null; location_name: string | null;
+        tags: string[] | null;
       } | null;
       if (!p || p.user_id !== session.user.id) {
         Alert.alert("접근 불가", "본인이 작성한 모먼트만 수정할 수 있어요.");
@@ -75,6 +78,7 @@ export default function NewPost() {
       setPhotos(p.photos ?? []);
       setVisibility(p.visibility);
       setLocationName(p.location_name ?? "");
+      setTags(p.tags ?? []);
       // 보틀링 태그도 로드
       if (p.bottling_id) {
         const { data: b } = await supabase
@@ -154,6 +158,21 @@ export default function NewPost() {
     setSearchResults([]);
   }
 
+  // 안드로이드 하드웨어 뒤로가기: picker 중이면 picker만 닫기
+  useEffect(() => {
+    const onBack = () => {
+      if (pickerOpen) {
+        setPickerOpen(false);
+        setSearchQ("");
+        setSearchResults([]);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [pickerOpen]);
+
   // 검색어로 새 위스키 즉시 등록 후 태그 (여기 카탈로그에 없는 위스키 대응)
   const [creatingBottling, setCreatingBottling] = useState(false);
   async function createAndTagBottling() {
@@ -226,6 +245,7 @@ export default function NewPost() {
         visibility,
         bottling_id: bottling?.id ?? null,
         location_name: locationName.trim() || null,
+        tags,
       } as never).eq("id", editId).eq("user_id", session.user.id);
       setPending(false);
       if (updateError) {
@@ -242,6 +262,7 @@ export default function NewPost() {
       visibility,
       bottling_id: bottling?.id ?? null,
       location_name: locationName.trim() || null,
+      tags,
     } as never).select("id").single();
     setPending(false);
 
@@ -445,6 +466,11 @@ export default function NewPost() {
               <Text style={styles.pickerBtnText}>위스키 검색해서 태그</Text>
             </Pressable>
           )}
+        </Field>
+
+        {/* 태그 */}
+        <Field label="태그 (선택)">
+          <TagInput value={tags} onChange={setTags} />
         </Field>
 
         {/* 위치 */}

@@ -9,6 +9,7 @@ import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { COUNTRY_FLAG, isEdited } from "@/lib/format";
 import { postPhotoUrl, tastingPhotoUrl } from "@/lib/uploads";
+import { loadBlockedUserIds } from "@/lib/blocks";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 
 const WINDOW_W = Dimensions.get("window").width;
@@ -57,11 +58,13 @@ export default function FeedScreen() {
   const load = useCallback(async () => {
     if (!session) return;
 
-    const { data: follows } = await supabase
-      .from("follows")
-      .select("followee_id")
-      .eq("follower_id", session.user.id);
-    const followeeIds = ((follows ?? []) as Array<{ followee_id: string }>).map((f) => f.followee_id);
+    const [followsRes, blockedSet] = await Promise.all([
+      supabase.from("follows").select("followee_id").eq("follower_id", session.user.id),
+      loadBlockedUserIds(session.user.id),
+    ]);
+    const followeeIds = ((followsRes.data ?? []) as Array<{ followee_id: string }>)
+      .map((f) => f.followee_id)
+      .filter((id) => !blockedSet.has(id));
     if (followeeIds.length === 0) {
       setItems([]); setEmpty("no_follows"); setLoading(false); return;
     }
@@ -197,25 +200,33 @@ export default function FeedScreen() {
   );
 
   return (
-    <FlatList
-      style={{ backgroundColor: "#0a0a0a" }}
-      data={items}
-      keyExtractor={(i) => `${i.kind}-${i.id}`}
-      contentContainerStyle={{ paddingBottom: 24 }}
-      renderItem={({ item }) => (
-        <FeedCard item={item} onUpdate={(updater) => {
-          setItems((prev) => prev.map((x) => x.id === item.id && x.kind === item.kind ? updater(x) : x));
-        }} />
-      )}
-      ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
-          tintColor="#fbbf24"
-        />
-      }
-    />
+    <View style={{ flex: 1, backgroundColor: "#0a0a0a" }}>
+      <FlatList
+        style={{ backgroundColor: "#0a0a0a" }}
+        data={items}
+        keyExtractor={(i) => `${i.kind}-${i.id}`}
+        contentContainerStyle={{ paddingBottom: 96 }}
+        renderItem={({ item }) => (
+          <FeedCard item={item} onUpdate={(updater) => {
+            setItems((prev) => prev.map((x) => x.id === item.id && x.kind === item.kind ? updater(x) : x));
+          }} />
+        )}
+        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
+            tintColor="#fbbf24"
+          />
+        }
+      />
+      <Pressable
+        onPress={() => router.push("/posts/new" as never)}
+        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
+      >
+        <Ionicons name="add" size={28} color="#0a0a0a" />
+      </Pressable>
+    </View>
   );
 }
 
@@ -419,4 +430,12 @@ const styles = StyleSheet.create({
 
   commentsLink: { color: "#737373", fontSize: 12, paddingHorizontal: 14, marginTop: 6 },
   time: { color: "#525252", fontSize: 10, paddingHorizontal: 14, marginTop: 6, textTransform: "uppercase" },
+  fab: {
+    position: "absolute", right: 20, bottom: 24,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: "#fbbf24",
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#fbbf24", shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
 });
