@@ -8,7 +8,8 @@ import { Stack, useRouter } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
-type Message = { role: "user" | "assistant"; content: string };
+type WhiskyMatch = { id: string; name: string; name_kr: string | null };
+type Message = { role: "user" | "assistant"; content: string; matches?: WhiskyMatch[] };
 
 const SUGGESTED_PROMPTS = [
   "10만원 이하 입문 스카치 3개 추천",
@@ -56,13 +57,13 @@ export default function CuratorScreen() {
         },
         body: JSON.stringify({ messages: next }),
       });
-      const json = await res.json() as { reply?: string; error?: string };
+      const json = await res.json() as { reply?: string; error?: string; matches?: WhiskyMatch[] };
       if (!res.ok || json.error) {
         Alert.alert("요청 실패", json.error ?? `HTTP ${res.status}`);
         setMessages(next);
         return;
       }
-      setMessages([...next, { role: "assistant", content: json.reply ?? "" }]);
+      setMessages([...next, { role: "assistant", content: json.reply ?? "", matches: json.matches ?? [] }]);
     } catch (e) {
       Alert.alert("네트워크 오류", e instanceof Error ? e.message : String(e));
     } finally {
@@ -112,10 +113,31 @@ export default function CuratorScreen() {
         ) : (
           messages.map((m, i) => (
             <View key={i} style={[styles.bubbleWrap, m.role === "user" ? styles.userWrap : styles.botWrap]}>
-              <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.botBubble]}>
-                <Text style={[styles.bubbleText, m.role === "user" ? styles.userText : styles.botText]}>
-                  {m.content}
-                </Text>
+              <View style={{ flex: 1, alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.botBubble]}>
+                  <Text style={[styles.bubbleText, m.role === "user" ? styles.userText : styles.botText]}>
+                    {m.content}
+                  </Text>
+                </View>
+                {m.role === "assistant" && m.matches && m.matches.length > 0 && (
+                  <View style={styles.matchesWrap}>
+                    <Text style={styles.matchesTitle}>언급된 위스키 · 탭하면 상세로</Text>
+                    <View style={styles.matchesRow}>
+                      {m.matches.map((w) => (
+                        <Pressable
+                          key={w.id}
+                          onPress={() => router.push(`/whiskies/${w.id}` as never)}
+                          style={({ pressed }) => [styles.matchChip, pressed && { opacity: 0.7 }]}
+                        >
+                          <Ionicons name="wine-outline" size={12} color="#fbbf24" />
+                          <Text style={styles.matchText} numberOfLines={1}>
+                            {w.name_kr ?? w.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
             </View>
           ))
@@ -182,6 +204,17 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 14, lineHeight: 20 },
   userText: { color: "#0a0a0a", fontWeight: "500" },
   botText: { color: "#e5e5e5" },
+  matchesWrap: { marginTop: 6, maxWidth: "85%", gap: 4 },
+  matchesTitle: { color: "#737373", fontSize: 10 },
+  matchesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  matchChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: "rgba(251, 191, 36, 0.08)",
+    borderWidth: 1, borderColor: "rgba(251, 191, 36, 0.4)",
+  },
+  matchText: { color: "#fbbf24", fontSize: 12, fontWeight: "500", maxWidth: 180 },
 
   inputRow: {
     flexDirection: "row", gap: 8, alignItems: "flex-end",

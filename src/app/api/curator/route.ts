@@ -196,7 +196,6 @@ export async function POST(request: Request) {
       .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
       .map((b) => b.text)
       .join("");
-    // 캐시 hit/miss 및 사용량 로그 (Vercel logs에서 확인 가능)
     const usage = resp.usage as unknown as {
       input_tokens: number;
       output_tokens: number;
@@ -210,7 +209,40 @@ export async function POST(request: Request) {
       cache_write: usage.cache_creation_input_tokens ?? 0,
       cache_read: usage.cache_read_input_tokens ?? 0,
     }));
-    return NextResponse.json({ reply: text }, {
+
+    // 답변에 언급된 위스키 매칭 — 카탈로그의 name/name_kr substring 검색
+    const { data: bottlings } = await supabase
+      .from("bottlings")
+      .select("id, name, name_kr")
+      .limit(2000);
+    const answerLower = text.toLowerCase();
+    type Row = { id: string; name: string | null; name_kr: string | null };
+    const rows = (bottlings ?? []) as Row[];
+    const matchesMap = new Map<string, { id: string; name: string; name_kr: string | null; matched: string }>();
+    for (const b of rows) {
+      const candidates: Array<{ text: string; source: "kr" | "en" }> = [];
+      if (b.name_kr && b.name_kr.length >= 3) candidates.push({ text: b.name_kr, source: "kr" });
+      if (b.name && b.name.length >= 3) candidates.push({ text: b.name, source: "en" });
+      for (const c of candidates) {
+        if (answerLower.includes(c.text.toLowerCase())) {
+          if (!matchesMap.has(b.id)) {
+            matchesMap.set(b.id, {
+              id: b.id,
+              name: b.name ?? c.text,
+              name_kr: b.name_kr,
+              matched: c.text,
+            });
+          }
+          break;
+        }
+      }
+    }
+    // 이름 길이 긴 것 우선 (더 구체적인 이름이 정확할 확률 높음)
+    const matches = Array.from(matchesMap.values())
+      .sort((a, b) => b.matched.length - a.matched.length)
+      .slice(0, 5);
+
+    return NextResponse.json({ reply: text, matches }, {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (e) {
