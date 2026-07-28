@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MapPin, Lock, Users, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/avatar";
-import { postPhotoUrl } from "@/lib/uploads/storage";
+import { postPhotoSignedUrls } from "@/lib/uploads/storage";
 import { COUNTRY_FLAG } from "@/lib/format";
 import { PostLikeButton } from "@/app/posts/[id]/_post-interactions";
 import { Pagination } from "@/components/pagination";
@@ -99,6 +99,16 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
     for (const l of data ?? []) myLikedIds.add(l.post_id);
   }
 
+  // post-photos private 버킷 — 각 리스트 아이템 hero 사진들 signed URL 일괄 발급
+  const allPhotoPaths: string[] = [];
+  for (const p of posts) for (const path of p.photos.slice(0, 6)) allPhotoPaths.push(path);
+  const signedUrls = await postPhotoSignedUrls(supabase, allPhotoPaths);
+  const signedUrlByPath = new Map<string, string>();
+  for (let i = 0; i < allPhotoPaths.length; i++) {
+    const url = signedUrls[i];
+    if (url) signedUrlByPath.set(allPhotoPaths[i], url);
+  }
+
   const total = count ?? 0;
 
   return (
@@ -186,7 +196,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
                     }
                   >
                     {p.photos.slice(0, 6).map((path) => {
-                      const url = postPhotoUrl(path);
+                      const url = signedUrlByPath.get(path) ?? null;
                       return url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

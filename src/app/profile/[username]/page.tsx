@@ -11,7 +11,7 @@ import { BadgeStrip } from "@/components/social/badge-strip";
 import type { UserBadgeRow } from "@/lib/badges";
 import { NotesFilterBar } from "@/components/social/notes-filter-bar";
 import { TastingTile, type TastingTileData } from "@/components/social/tasting-tile";
-import { postPhotoUrl } from "@/lib/uploads/storage";
+import { postPhotoSignedUrls } from "@/lib/uploads/storage";
 import type { WhiskyCountry } from "@/types/database";
 import {
   FLAVOR_COLUMN,
@@ -224,6 +224,21 @@ export default async function PublicProfilePage({
   const { data: postsRaw, count: postCount } = await postsQuery;
   const posts = postsRaw ?? [];
 
+  const postHeroPaths = posts.map((p) => (p.photos?.[0] ?? null) as string | null);
+  const postHeroUrls = await postPhotoSignedUrls(
+    supabase,
+    postHeroPaths.filter((v): v is string => !!v),
+  );
+  const heroUrlByPath = new Map<string, string>();
+  {
+    let uIdx = 0;
+    for (const path of postHeroPaths) {
+      if (!path) continue;
+      const url = postHeroUrls[uIdx++];
+      if (url) heroUrlByPath.set(path, url);
+    }
+  }
+
   const displayName = profile.display_name ?? profile.username;
   const joinedDate = new Date(profile.created_at).toISOString().slice(0, 7);
 
@@ -372,7 +387,7 @@ export default async function PublicProfilePage({
           <ul className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {posts.map((p) => {
               const first = p.photos[0];
-              const url = first ? postPhotoUrl(first) : null;
+              const url = first ? heroUrlByPath.get(first) ?? null : null;
               return (
                 <li key={p.id}>
                   <Link

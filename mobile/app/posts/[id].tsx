@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { postPhotoUrl } from "@/lib/uploads";
+import { postPhotoSignedUrls } from "@/lib/uploads";
 import { COUNTRY_FLAG, isEdited } from "@/lib/format";
 import { isValidUuid } from "@/lib/params";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
@@ -69,6 +69,7 @@ export default function PostDetail() {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<Array<string | null>>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -152,6 +153,12 @@ export default function PostDetail() {
         country: b.country,
       } : null);
       setLiked(!!likeRes.data);
+
+      if (p.photos.length > 0) {
+        setPhotoUrls(await postPhotoSignedUrls(p.photos));
+      } else {
+        setPhotoUrls([]);
+      }
 
       await loadComments(p.id);
       setLoading(false);
@@ -325,7 +332,7 @@ export default function PostDetail() {
             {post.photos.length === 1 ? (
               <Pressable onPress={() => setLightboxIndex(0)} style={styles.singlePhoto}>
                 <Image
-                  source={{ uri: postPhotoUrl(post.photos[0]) ?? undefined }}
+                  source={{ uri: photoUrls[0] ?? undefined }}
                   style={styles.singlePhotoImg}
                   resizeMode="cover"
                 />
@@ -333,7 +340,7 @@ export default function PostDetail() {
             ) : (
               <View style={styles.photoGrid}>
                 {post.photos.map((path, i) => {
-                  const url = postPhotoUrl(path);
+                  const url = photoUrls[i];
                   return url ? (
                     <Pressable
                       key={path}
@@ -490,7 +497,7 @@ export default function PostDetail() {
       {post.photos.length > 0 && (
         <PhotoLightbox
           visible={lightboxIndex !== null}
-          urls={post.photos.map((p) => postPhotoUrl(p))}
+          urls={photoUrls}
           initialIndex={lightboxIndex ?? 0}
           onClose={() => setLightboxIndex(null)}
         />

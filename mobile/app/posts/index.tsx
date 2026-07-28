@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect, useLocalSearchParams, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { postPhotoUrl } from "@/lib/uploads";
+import { postPhotoSignedUrls } from "@/lib/uploads";
 import { COUNTRY_FLAG, isEdited } from "@/lib/format";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 
@@ -51,6 +51,7 @@ export default function PostsList() {
   const { mine } = useLocalSearchParams<{ mine?: string }>();
   const showMineOnly = mine === "1" && !!session;
   const [posts, setPosts] = useState<Post[]>([]);
+  const [heroUrls, setHeroUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState<"all" | TastingVisibility>("all");
@@ -156,6 +157,20 @@ export default function PostsList() {
       })),
     );
     setLoading(false);
+
+    // post-photos private 버킷 — 각 카드 hero 사진 signed URL 발급
+    const heroPaths = rows.map((r) => r.photos?.[0]).filter((p): p is string => !!p);
+    if (heroPaths.length > 0) {
+      const signed = await postPhotoSignedUrls(heroPaths);
+      const map: Record<string, string> = {};
+      for (let i = 0; i < heroPaths.length; i++) {
+        const u = signed[i];
+        if (u) map[heroPaths[i]] = u;
+      }
+      setHeroUrls(map);
+    } else {
+      setHeroUrls({});
+    }
   }, [session, showMineOnly, visibilityFilter]);
 
   useFocusEffect(
@@ -230,21 +245,24 @@ export default function PostsList() {
           tintColor="#fbbf24"
         />
       }
-      renderItem={({ item: p }) => <PostCard post={p} router={router} />}
+      renderItem={({ item: p }) => (
+        <PostCard post={p} heroUrl={p.photos?.[0] ? heroUrls[p.photos[0]] ?? null : null} router={router} />
+      )}
     />
     </>
   );
 }
 
 function PostCard({
-  post: p, router,
+  post: p, heroUrl, router,
 }: {
   post: Post;
+  heroUrl: string | null;
   router: ReturnType<typeof useRouter>;
 }) {
   const authorName = p.author?.display_name ?? p.author?.username ?? "익명";
   const initial = authorName.trim().charAt(0).toUpperCase();
-  const heroPhoto = p.photos?.[0] ? postPhotoUrl(p.photos[0]) : null;
+  const heroPhoto = heroUrl;
 
   return (
     <Pressable

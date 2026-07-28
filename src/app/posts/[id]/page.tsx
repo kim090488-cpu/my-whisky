@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { ChevronLeft, Lock, MapPin, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/avatar";
-import { postPhotoUrl } from "@/lib/uploads/storage";
+import { postPhotoSignedUrls } from "@/lib/uploads/storage";
 import { PhotoGallery } from "@/components/tastings/photo-gallery";
 import { TagChips } from "@/components/tag-input";
 import { COUNTRY_FLAG } from "@/lib/format";
@@ -95,6 +95,10 @@ export default async function PostDetailPage({ params }: { params: Params }) {
   const liked = !!myLikeRes.data;
   const comments = commentsRes.data ?? [];
 
+  const photoUrls: Array<string | null> = post.photos.length > 0
+    ? await postPhotoSignedUrls(supabase, post.photos)
+    : [];
+
   const commentUserIds = Array.from(new Set(comments.map((c) => c.user_id)));
   const commentProfilesById = new Map<
     string,
@@ -153,7 +157,7 @@ export default async function PostDetailPage({ params }: { params: Params }) {
       {post.photos.length > 0 && (
         <div className="mt-5">
           <PhotoGallery
-            urls={post.photos.map((p) => postPhotoUrl(p))}
+            urls={photoUrls}
             gridClassName={
               post.photos.length === 1 ? "" : "grid grid-cols-2 gap-1.5"
             }

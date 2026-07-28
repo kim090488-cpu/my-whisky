@@ -8,7 +8,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { COUNTRY_FLAG, isEdited } from "@/lib/format";
-import { postPhotoUrl, tastingPhotoUrl } from "@/lib/uploads";
+import { postPhotoSignedUrls, tastingPhotoUrl } from "@/lib/uploads";
 import { loadBlockedUserIds } from "@/lib/blocks";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
 
@@ -51,6 +51,7 @@ export default function FeedScreen() {
   const router = useRouter();
   const { session, loading: sessionLoading } = useSession();
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [postPhotoSigned, setPostPhotoSigned] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [empty, setEmpty] = useState<"no_session" | "no_follows" | "no_items" | null>(null);
@@ -162,6 +163,22 @@ export default function FeedScreen() {
     );
     setEmpty(null);
     setLoading(false);
+
+    // post-photos private 버킷 — post-kind item들의 모든 사진 signed URL 발급 (tasting은 public bucket 유지)
+    const postPaths = merged
+      .filter((m) => m.kind === "post")
+      .flatMap((m) => m.photos);
+    if (postPaths.length > 0) {
+      const signed = await postPhotoSignedUrls(postPaths);
+      const map: Record<string, string> = {};
+      for (let i = 0; i < postPaths.length; i++) {
+        const u = signed[i];
+        if (u) map[postPaths[i]] = u;
+      }
+      setPostPhotoSigned(map);
+    } else {
+      setPostPhotoSigned({});
+    }
   }, [session]);
 
   useEffect(() => {
@@ -207,7 +224,7 @@ export default function FeedScreen() {
         keyExtractor={(i) => `${i.kind}-${i.id}`}
         contentContainerStyle={{ paddingBottom: 96 }}
         renderItem={({ item }) => (
-          <FeedCard item={item} onUpdate={(updater) => {
+          <FeedCard item={item} postPhotoSigned={postPhotoSigned} onUpdate={(updater) => {
             setItems((prev) => prev.map((x) => x.id === item.id && x.kind === item.kind ? updater(x) : x));
           }} />
         )}
@@ -230,7 +247,11 @@ export default function FeedScreen() {
   );
 }
 
-function FeedCard({ item, onUpdate }: { item: FeedItem; onUpdate: (updater: (prev: FeedItem) => FeedItem) => void }) {
+function FeedCard({ item, postPhotoSigned, onUpdate }: {
+  item: FeedItem;
+  postPhotoSigned: Record<string, string>;
+  onUpdate: (updater: (prev: FeedItem) => FeedItem) => void;
+}) {
   const router = useRouter();
   const { session } = useSession();
   const [likePending, setLikePending] = useState(false);
@@ -264,7 +285,8 @@ function FeedCard({ item, onUpdate }: { item: FeedItem; onUpdate: (updater: (pre
     setLikePending(false);
   }
 
-  const photoUrl = (path: string) => item.kind === "post" ? postPhotoUrl(path) : tastingPhotoUrl(path);
+  const photoUrl = (path: string) =>
+    item.kind === "post" ? (postPhotoSigned[path] ?? null) : tastingPhotoUrl(path);
 
   return (
     <View style={styles.card}>

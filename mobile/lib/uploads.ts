@@ -112,8 +112,48 @@ export function bottlingImageUrl(pathOrUrl: string | null | undefined): string |
   return publicUrl(BOTTLING_IMAGES_BUCKET, pathOrUrl);
 }
 
-export function postPhotoUrl(pathOrUrl: string | null | undefined): string | null {
-  return publicUrl(POST_PHOTOS_BUCKET, pathOrUrl);
+// ── post-photos signed URL (private bucket, 2026-07-28~) ──
+const POST_SIGNED_URL_TTL_SEC = 3600;
+
+export async function postPhotoSignedUrl(
+  pathOrUrl: string | null | undefined,
+): Promise<string | null> {
+  if (!pathOrUrl) return null;
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) return pathOrUrl;
+  const { data, error } = await supabase.storage
+    .from(POST_PHOTOS_BUCKET)
+    .createSignedUrl(pathOrUrl, POST_SIGNED_URL_TTL_SEC);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+export async function postPhotoSignedUrls(
+  paths: (string | null | undefined)[],
+): Promise<Array<string | null>> {
+  if (paths.length === 0) return [];
+  const bucketPaths: string[] = [];
+  const positions: number[] = [];
+  for (let i = 0; i < paths.length; i++) {
+    const p = paths[i];
+    if (!p || p.startsWith("http")) continue;
+    bucketPaths.push(p);
+    positions.push(i);
+  }
+  const result: Array<string | null> = new Array(paths.length).fill(null);
+  for (let i = 0; i < paths.length; i++) {
+    const p = paths[i];
+    if (p && p.startsWith("http")) result[i] = p;
+  }
+  if (bucketPaths.length === 0) return result;
+  const { data } = await supabase.storage
+    .from(POST_PHOTOS_BUCKET)
+    .createSignedUrls(bucketPaths, POST_SIGNED_URL_TTL_SEC);
+  if (data) {
+    for (let i = 0; i < data.length; i++) {
+      result[positions[i]] = data[i]?.signedUrl ?? null;
+    }
+  }
+  return result;
 }
 
 function publicUrl(bucket: string, p: string | null | undefined): string | null {

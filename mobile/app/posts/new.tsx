@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import {
-  pickAndUploadPostPhoto, deletePostPhoto, postPhotoUrl,
+  pickAndUploadPostPhoto, deletePostPhoto, postPhotoSignedUrls,
 } from "@/lib/uploads";
 import { COUNTRY_FLAG } from "@/lib/format";
 import { TagInput } from "@/components/tag-input";
@@ -39,6 +39,7 @@ export default function NewPost() {
   const { session } = useSession();
 
   const [photos, setPhotos] = useState<string[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [body, setBody] = useState("");
   const [visibility, setVisibility] = useState<TastingVisibility>("public");
   const [locationName, setLocationName] = useState("");
@@ -92,6 +93,23 @@ export default function NewPost() {
       setLoadingExisting(false);
     })();
   }, [editId, session, router]);
+
+  // 사진 preview signed URL (photos 변화 시 없는 경로만 발급)
+  useEffect(() => {
+    const missing = photos.filter((p) => !previewUrls[p]);
+    if (missing.length === 0) return;
+    (async () => {
+      const signed = await postPhotoSignedUrls(missing);
+      setPreviewUrls((prev) => {
+        const next = { ...prev };
+        for (let i = 0; i < missing.length; i++) {
+          const u = signed[i];
+          if (u) next[missing[i]] = u;
+        }
+        return next;
+      });
+    })();
+  }, [photos, previewUrls]);
 
   // 신규 진입 시 bottling prefill
   useEffect(() => {
@@ -383,7 +401,7 @@ export default function NewPost() {
         <Field label={`사진 (${photos.length}/${MAX_PHOTOS})`}>
           <View style={styles.photoRow}>
             {photos.map((p, i) => {
-              const url = postPhotoUrl(p);
+              const url = previewUrls[p];
               return (
                 <View key={p} style={styles.photoBox}>
                   {url && <Image source={{ uri: url }} style={styles.photoImg} />}

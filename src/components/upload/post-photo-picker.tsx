@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { stripExifAndResize } from "@/lib/uploads/strip-exif";
-import { POST_PHOTOS_BUCKET, postPhotoUrl } from "@/lib/uploads/storage";
+import { POST_PHOTOS_BUCKET } from "@/lib/uploads/storage";
 
 const MAX_PHOTOS = 10;
 const MAX_FILE_MB = 15;
+const SIGNED_URL_TTL_SEC = 3600;
 
 type Props = {
   userId: string;
@@ -18,8 +19,30 @@ export function PostPhotoPicker({ userId, paths, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
 
   const canAdd = paths.length < MAX_PHOTOS;
+
+  // paths 변화 → 아직 URL 없는 경로에 대해 signed URL 발급
+  useEffect(() => {
+    const missing = paths.filter((p) => !previewUrls[p]);
+    if (missing.length === 0) return;
+    const supabase = createClient();
+    supabase.storage
+      .from(POST_PHOTOS_BUCKET)
+      .createSignedUrls(missing, SIGNED_URL_TTL_SEC)
+      .then(({ data }) => {
+        if (!data) return;
+        setPreviewUrls((prev) => {
+          const next = { ...prev };
+          for (let i = 0; i < data.length; i++) {
+            const url = data[i]?.signedUrl;
+            if (url) next[missing[i]] = url;
+          }
+          return next;
+        });
+      });
+  }, [paths, previewUrls]);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -73,7 +96,7 @@ export function PostPhotoPicker({ userId, paths, onChange }: Props) {
     <div>
       <div className="flex flex-wrap items-center gap-3">
         {paths.map((p, i) => {
-          const url = postPhotoUrl(p);
+          const url = previewUrls[p];
           return (
             <div
               key={p}
