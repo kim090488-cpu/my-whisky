@@ -10,13 +10,14 @@ function buildCsp(nonce: string): string {
   const supabaseConnect = ["https://*.supabase.co", "wss://*.supabase.co"].join(" ");
   return [
     "default-src 'self'",
-    // 'strict-dynamic'를 쓰지 않고 'self'와 nonce를 병기 —
-    //   Next.js 정적 chunk('self')와 nonce된 인라인 스크립트만 허용.
-    //   dev에서는 Turbopack HMR을 위해 'unsafe-eval' 추가.
+    // 'self' + nonce 병기 — Next.js 정적 chunk와 nonce된 인라인 스크립트만 허용.
+    // dev에서는 Turbopack HMR을 위해 'unsafe-eval' 추가.
     `script-src 'self' 'nonce-${nonce}'${isDev ? " 'unsafe-eval'" : ""}`,
-    // style-src: Tailwind는 정적이지만 Next.js가 preload용 inline style을 삽입할 수 있어 유지.
-    //   차후 별도 마일스톤에서 nonce 스타일로 전환 고려.
-    "style-src 'self' 'unsafe-inline'",
+    // style-src: <style> 태그와 <link stylesheet>은 self+nonce만 허용.
+    // style-src-attr: React에서 흔한 인라인 style="..." 속성(progress bar width 등)은 별도 허용.
+    // 'unsafe-inline'을 style-src 전체에 주지 않고 attr에만 제한해 XSS <style> 주입은 여전히 차단.
+    `style-src 'self' 'nonce-${nonce}'`,
+    "style-src-attr 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     `connect-src 'self' ${supabaseConnect}`,
