@@ -5,13 +5,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
-const STORAGE_KEY_PREFIX = "curator:v1:";
-const MAX_STORED_MESSAGES = 50;
+const MAX_LOADED_MESSAGES = 50;
 
 type WhiskyMatch = { id: string; name: string; name_kr: string | null };
 type Message = { role: "user" | "assistant"; content: string; matches?: WhiskyMatch[] };
@@ -37,42 +35,45 @@ export default function CuratorScreen() {
   const [loaded, setLoaded] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
-  const storageKey = session ? `${STORAGE_KEY_PREFIX}${session.user.id}` : null;
+  const userId = session?.user.id ?? null;
 
-  // 대화 히스토리 로드 (유저별 로컬 저장)
+  // 대화 히스토리 로드 (Supabase — 기기 간 동기화)
   useEffect(() => {
-    if (!storageKey) { setLoaded(true); return; }
+    if (!userId) { setLoaded(true); return; }
     (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(storageKey);
-        if (raw) {
-          const parsed = JSON.parse(raw) as Message[];
-          if (Array.isArray(parsed)) setMessages(parsed);
-        }
-      } catch { /* ignore parse errors */ }
+      const { data } = await supabase
+        .from("curator_messages")
+        .select("role, content, matches")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(MAX_LOADED_MESSAGES);
+      const rows = (data ?? []) as unknown as Array<{
+        role: "user" | "assistant";
+        content: string;
+        matches: WhiskyMatch[] | null;
+      }>;
+      const rev = rows.slice().reverse();
+      setMessages(rev.map((r) => ({
+        role: r.role,
+        content: r.content,
+        ...(r.matches ? { matches: r.matches } : {}),
+      })));
       setLoaded(true);
     })();
-  }, [storageKey]);
-
-  // 대화 히스토리 저장 (최근 50 turn만)
-  useEffect(() => {
-    if (!storageKey || !loaded) return;
-    const toStore = messages.slice(-MAX_STORED_MESSAGES);
-    AsyncStorage.setItem(storageKey, JSON.stringify(toStore)).catch(() => {});
-  }, [messages, storageKey, loaded]);
+  }, [userId]);
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
   function resetChat() {
-    if (messages.length === 0) return;
+    if (messages.length === 0 || !userId) return;
     Alert.alert("대화 초기화", "지금까지 나눈 대화를 모두 지울까요?", [
       { text: "취소", style: "cancel" },
       {
-        text: "초기화", style: "destructive", onPress: () => {
+        text: "초기화", style: "destructive", onPress: async () => {
           setMessages([]);
-          if (storageKey) AsyncStorage.removeItem(storageKey).catch(() => {});
+          await supabase.from("curator_messages").delete().eq("user_id", userId);
         },
       },
     ]);
@@ -108,7 +109,27 @@ export default function CuratorScreen() {
         setMessages(next);
         return;
       }
-      setMessages([...next, { role: "assistant", content: json.reply ?? "", matches: json.matches ?? [] }]);
+      const assistantMsg: Message = {
+        role: "assistant",
+        content: json.reply ?? "",
+        matches: json.matches ?? [],
+      };
+      setMessages([...next, assistantMsg]);
+
+      // 성공 시 유저·assistant 메시지 DB 저장 (기기 간 동기화)
+      if (userId) {
+        await supabase.from("curator_messages").insert([
+          { user_id: userId, role: "user", content: q, matches: null },
+          {
+            user_id: userId,
+            role: "assistant",
+            content: assistantMsg.content,
+            matches: assistantMsg.matches && assistantMsg.matches.length > 0
+              ? (assistantMsg.matches as unknown as never)
+              : null,
+          },
+        ] as never);
+      }
     } catch (e) {
       Alert.alert("네트워크 오류", e instanceof Error ? e.message : String(e));
     } finally {

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUp, RefreshCw, Wine } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-const STORAGE_KEY_PREFIX = "curator:v1:";
-const MAX_STORED_MESSAGES = 50;
+const MAX_LOADED_MESSAGES = 50;
 
 type WhiskyMatch = { id: string; name: string; name_kr: string | null };
 type Message = { role: "user" | "assistant"; content: string; matches?: WhiskyMatch[] };
@@ -27,50 +27,51 @@ export function CuratorChat({ userId }: { userId: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const storageKey = `${STORAGE_KEY_PREFIX}${userId}`;
-
+  // DB에서 최근 50 turn 로드 (기기 간 동기화)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Message[];
-        if (Array.isArray(parsed)) setMessages(parsed);
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("curator_messages")
+        .select("role, content, matches")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(MAX_LOADED_MESSAGES);
+      if (data) {
+        // 최신순 fetch → UI는 오래된 것부터
+        const rows = data as unknown as Array<{
+          role: "user" | "assistant";
+          content: string;
+          matches: WhiskyMatch[] | null;
+        }>;
+        const rev = rows.slice().reverse();
+        setMessages(rev.map((r) => ({
+          role: r.role,
+          content: r.content,
+          ...(r.matches ? { matches: r.matches } : {}),
+        })));
       }
-    } catch {
-      /* ignore */
-    }
-    setLoaded(true);
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!loaded) return;
-    const toStore = messages.slice(-MAX_STORED_MESSAGES);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(toStore));
-    } catch {
-      /* ignore quota */
-    }
-  }, [messages, storageKey, loaded]);
+      setLoaded(true);
+    })();
+  }, [userId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
 
-  function resetChat() {
+  async function resetChat() {
     if (messages.length === 0) return;
     if (!confirm("지금까지 나눈 대화를 모두 지울까요?")) return;
     setMessages([]);
-    try {
-      localStorage.removeItem(storageKey);
-    } catch {
-      /* ignore */
-    }
+    const supabase = createClient();
+    await supabase.from("curator_messages").delete().eq("user_id", userId);
   }
 
   async function send(promptOverride?: string) {
     const q = (promptOverride ?? input).trim();
     if (!q || pending) return;
-    const next: Message[] = [...messages, { role: "user", content: q }];
+    const userMsg: Message = { role: "user", content: q };
+    const next: Message[] = [...messages, userMsg];
     setMessages(next);
     setInput("");
     setError(null);
@@ -89,11 +90,28 @@ export function CuratorChat({ userId }: { userId: string }) {
       };
       if (!res.ok || json.error) {
         setError(json.error ?? `HTTP ${res.status}`);
+        // 실패한 유저 메시지는 UI에서만 유지 (DB 저장 X — 재시도 가능)
         return;
       }
-      setMessages([
-        ...next,
-        { role: "assistant", content: json.reply ?? "", matches: json.matches ?? [] },
+      const assistantMsg: Message = {
+        role: "assistant",
+        content: json.reply ?? "",
+        matches: json.matches ?? [],
+      };
+      setMessages([...next, assistantMsg]);
+
+      // 성공 시 유저·assistant 메시지 DB 저장
+      const supabase = createClient();
+      await supabase.from("curator_messages").insert([
+        { user_id: userId, role: "user", content: q, matches: null },
+        {
+          user_id: userId,
+          role: "assistant",
+          content: assistantMsg.content,
+          matches: assistantMsg.matches && assistantMsg.matches.length > 0
+            ? (assistantMsg.matches as unknown as never)
+            : null,
+        },
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -117,7 +135,11 @@ export function CuratorChat({ userId }: { userId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto py-4">
-        {messages.length === 0 ? (
+        {!loaded ? (
+          <div className="flex justify-center py-12">
+            <TypingDots />
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <div className="text-5xl">🥃</div>
             <h2 className="mt-2 font-serif text-lg text-foreground">

@@ -730,6 +730,25 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["user_badges"]["Insert"]>;
         Relationships: [];
       };
+      // ── 2026-07-29 AI 큐레이터 대화 이력 ──
+      curator_messages: {
+        Row: {
+          id: string;
+          user_id: string;
+          role: "user" | "assistant";
+          content: string;
+          matches: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          role: "user" | "assistant";
+          content: string;
+          matches?: Json | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["curator_messages"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       bottling_card_stats: {
