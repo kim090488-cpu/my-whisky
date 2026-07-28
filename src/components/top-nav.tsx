@@ -39,6 +39,7 @@ export async function TopNav() {
           <NavLink href="/whiskies">위스키</NavLink>
           <NavLink href="/tastings">노트</NavLink>
           <NavLink href="/posts">모먼트</NavLink>
+          <NavLink href="/community">커뮤니티</NavLink>
           <NavLink href="/distilleries">증류소</NavLink>
           <NavLink href="/ranking">랭킹</NavLink>
           <NavLink href="/picks">추천</NavLink>
