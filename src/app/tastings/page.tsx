@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/pagination";
 import { TastingTile, type TastingTileData } from "@/components/social/tasting-tile";
+import { loadBlockedUserIds } from "@/lib/social/blocks";
 import { COUNTRY_LABEL } from "@/lib/format";
 import type { WhiskyCountry } from "@/types/database";
 import { FilterBar } from "./_filter-bar";
@@ -76,7 +77,7 @@ export default async function TastingsPage({ searchParams }: { searchParams: Sea
     let query = supabase
       .from("tastings")
       .select(
-        "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, created_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length",
+        "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, created_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, tags",
         { count: "exact" },
       )
       .eq("visibility", "public");
@@ -86,6 +87,11 @@ export default async function TastingsPage({ searchParams }: { searchParams: Sea
     if (buyback) query = query.eq("would_buy_again", true);
     for (const f of flavors) {
       query = query.gte(FLAVOR_COLUMN[f], FLAVOR_THRESHOLD);
+    }
+
+    const blockedIds = await loadBlockedUserIds(supabase, user?.id ?? null);
+    if (blockedIds.size > 0) {
+      query = query.not("user_id", "in", `(${Array.from(blockedIds).join(",")})`);
     }
 
     switch (sort) {

@@ -6,6 +6,7 @@ import { postPhotoUrl } from "@/lib/uploads/storage";
 import { COUNTRY_FLAG } from "@/lib/format";
 import { PostLikeButton } from "@/app/posts/[id]/_post-interactions";
 import { Pagination } from "@/components/pagination";
+import { loadBlockedUserIds } from "@/lib/social/blocks";
 import type { WhiskyCountry } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -29,13 +30,19 @@ export default async function PostsPage({ searchParams }: { searchParams: Search
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: postsRaw, count } = await supabase
+  const blockedIds = await loadBlockedUserIds(supabase, user?.id ?? null);
+
+  let postsQuery = supabase
     .from("posts")
     .select(
       "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at",
       { count: "exact" },
     )
-    .eq("visibility", "public")
+    .eq("visibility", "public");
+  if (blockedIds.size > 0) {
+    postsQuery = postsQuery.not("user_id", "in", `(${Array.from(blockedIds).join(",")})`);
+  }
+  const { data: postsRaw, count } = await postsQuery
     .order("created_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
 

@@ -181,6 +181,54 @@ export async function deletePostComment(formData: FormData) {
   return { ok: true };
 }
 
+export async function toggleUserBlock(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "로그인이 필요합니다." };
+
+  const limit = rateLimit(`block:${user.id}`, { max: 30, windowMs: 60_000 });
+  if (!limit.ok) {
+    return { error: `너무 빠른 요청이에요. ${Math.ceil(limit.retryAfterMs / 1000)}초 후 다시 시도해주세요.` };
+  }
+
+  const blockedIdRaw = String(formData.get("blocked_id") ?? "").trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(blockedIdRaw)) {
+    return { error: "잘못된 대상입니다." };
+  }
+  if (blockedIdRaw === user.id) return { error: "자기 자신은 차단할 수 없어요." };
+
+  const { data: existing } = await supabase
+    .from("user_blocks")
+    .select("id")
+    .eq("blocker_id", user.id)
+    .eq("blocked_id", blockedIdRaw)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase.from("user_blocks").delete().eq("id", existing.id);
+    if (error) return { error: error.message };
+    revalidatePath("/", "layout");
+    return { ok: true, blocked: false };
+  }
+
+  // 차단 시 서로 팔로우 관계도 해제 (양방향)
+  await supabase
+    .from("follows")
+    .delete()
+    .or(
+      `and(follower_id.eq.${user.id},followee_id.eq.${blockedIdRaw}),and(follower_id.eq.${blockedIdRaw},followee_id.eq.${user.id})`,
+    );
+
+  const { error } = await supabase
+    .from("user_blocks")
+    .insert({ blocker_id: user.id, blocked_id: blockedIdRaw });
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true, blocked: true };
+}
+
 export async function toggleTastingLike(formData: FormData) {
   const supabase = await createClient();
   const {
