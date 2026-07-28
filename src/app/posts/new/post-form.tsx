@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createPost } from "@/lib/posts/actions";
 import { PostPhotoPicker } from "@/components/upload/post-photo-picker";
+import { TagInput } from "@/components/tag-input";
 import type { PostVisibility } from "@/types/database";
 
 type PrefillBottling = {
@@ -27,6 +28,7 @@ export function PostForm({ userId, prefillBottling }: Props) {
   const [visibility, setVisibility] = useState<PostVisibility>("public");
   const [bottling, setBottling] = useState<PrefillBottling | null>(prefillBottling);
   const [locationName, setLocationName] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -44,6 +46,7 @@ export function PostForm({ userId, prefillBottling }: Props) {
     fd.set("visibility", visibility);
     if (bottling) fd.set("bottling_id", bottling.id);
     if (locationName) fd.set("location_name", locationName);
+    fd.set("tags", JSON.stringify(tags));
 
     startTransition(async () => {
       const res = await createPost(fd);
@@ -103,6 +106,14 @@ export function PostForm({ userId, prefillBottling }: Props) {
             보틀 페이지에서 "+ 모먼트" 누르고 들어오면 자동 태그 됩니다.
           </p>
         )}
+      </div>
+
+      {/* 태그 */}
+      <div>
+        <Label>태그 (선택)</Label>
+        <div className="mt-2">
+          <TagInput value={tags} onChange={setTags} />
+        </div>
       </div>
 
       {/* 장소 */}

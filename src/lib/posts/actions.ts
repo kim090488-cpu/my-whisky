@@ -46,6 +46,21 @@ export async function createPost(formData: FormData) {
   if (location_name && location_name.length > 100)
     return { error: "장소명은 100자 이내로 작성해주세요." };
 
+  const tagsRaw = String(formData.get("tags") ?? "[]");
+  let tags: string[] = [];
+  try {
+    const parsed = JSON.parse(tagsRaw);
+    if (Array.isArray(parsed)) {
+      tags = parsed
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0 && t.length <= 30)
+        .slice(0, 10);
+    }
+  } catch {
+    // ignore
+  }
+
   const { data: inserted, error } = await supabase
     .from("posts")
     .insert({
@@ -55,6 +70,7 @@ export async function createPost(formData: FormData) {
       visibility,
       bottling_id,
       location_name,
+      tags,
     })
     .select("id")
     .single();

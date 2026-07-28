@@ -31,7 +31,7 @@ export default async function EditTastingPage({ params }: { params: Params }) {
         "tasted_at, color, visibility, photos, " +
         "sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, " +
         "purchase_price, purchase_currency, purchase_country, purchased_at_place, " +
-        "food_pairing, bottle_owned_verified",
+        "food_pairing, bottle_owned_verified, tags",
     )
     .eq("id", id)
     .maybeSingle();
@@ -67,6 +67,7 @@ export default async function EditTastingPage({ params }: { params: Params }) {
     purchase_country: t.purchase_country ?? "",
     purchased_at_place: t.purchased_at_place ?? "",
     food_pairing: t.food_pairing ?? "",
+    tags: (t.tags ?? []) as string[],
   };
 
   return (

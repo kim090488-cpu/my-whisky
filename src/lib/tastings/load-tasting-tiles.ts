@@ -7,7 +7,7 @@ export type TastingBaseRow = Omit<TastingTileData, "profile" | "bottling" | "lik
 };
 
 export const TASTING_TILE_COLUMNS =
-  "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length";
+  "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, tags";
 
 export async function enrichTastings(
   supabase: SupabaseClient<Database>,

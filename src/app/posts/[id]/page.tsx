@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/avatar";
 import { postPhotoUrl } from "@/lib/uploads/storage";
 import { PhotoGallery } from "@/components/tastings/photo-gallery";
+import { TagChips } from "@/components/tag-input";
 import { COUNTRY_FLAG } from "@/lib/format";
 import { PostLikeButton, PostCommentForm, DeleteCommentButton } from "./_post-interactions";
 import type { WhiskyCountry } from "@/types/database";
@@ -44,7 +45,7 @@ export default async function PostDetailPage({ params }: { params: Params }) {
   const { data: post } = await supabase
     .from("posts")
     .select(
-      "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at",
+      "id, user_id, body, photos, visibility, bottling_id, location_name, like_count, comment_count, created_at, tags",
     )
     .eq("id", id)
     .maybeSingle();
@@ -186,6 +187,12 @@ export default async function PostDetailPage({ params }: { params: Params }) {
           </span>
         )}
       </div>
+
+      {(post.tags?.length ?? 0) > 0 && (
+        <div className="mt-3">
+          <TagChips tags={post.tags as string[]} />
+        </div>
+      )}
 
       {/* actions */}
       <div className="mt-5 flex items-center gap-1 border-y border-border py-2">

@@ -13,6 +13,7 @@ import { ReportButton } from "@/components/social/report-button";
 import { FlavorRadar } from "@/components/social/flavor-radar";
 import { bottlingImageUrl, tastingPhotoUrl } from "@/lib/uploads/storage";
 import { PhotoGallery } from "@/components/tastings/photo-gallery";
+import { TagChips } from "@/components/tag-input";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export default async function TastingDetailPage({ params }: { params: Params }) 
   const { data: t } = await supabase
     .from("tastings")
     .select(
-      "id, tasted_at, score, notes, color, photos, visibility, user_id, bottling_id, like_count, comment_count, created_at, would_buy_again, value_for_money, recommended_for, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, purchase_price, purchase_currency, purchased_at_place, food_pairing",
+      "id, tasted_at, score, notes, color, photos, visibility, user_id, bottling_id, like_count, comment_count, created_at, would_buy_again, value_for_money, recommended_for, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, purchase_price, purchase_currency, purchased_at_place, food_pairing, tags",
     )
     .eq("id", id)
     .maybeSingle();
@@ -216,6 +217,10 @@ export default async function TastingDetailPage({ params }: { params: Params }) 
 
         {!t.color && !t.notes && (
           <p className="text-sm text-neutral-500">본문 없는 노트.</p>
+        )}
+
+        {(t.tags?.length ?? 0) > 0 && (
+          <TagChips tags={t.tags as string[]} />
         )}
       </section>
 

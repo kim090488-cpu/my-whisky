@@ -32,6 +32,7 @@ type ParsedFields = {
   tasted_at: string | undefined;
   photos: string[];
   bottle_owned_verified: boolean;
+  tags: string[];
 };
 
 function parseTastingFields(
@@ -73,6 +74,21 @@ function parseTastingFields(
     // ignore
   }
 
+  const tagsRaw = String(formData.get("tags") ?? "[]");
+  let tags: string[] = [];
+  try {
+    const parsed = JSON.parse(tagsRaw);
+    if (Array.isArray(parsed)) {
+      tags = parsed
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0 && t.length <= 30)
+        .slice(0, 10);
+    }
+  } catch {
+    // ignore
+  }
+
   return {
     error: null,
     data: {
@@ -98,6 +114,7 @@ function parseTastingFields(
       tasted_at,
       photos,
       bottle_owned_verified: parseBool(formData.get("bottle_owned_verified")) === true,
+      tags,
     },
   };
 }

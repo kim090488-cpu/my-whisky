@@ -79,7 +79,7 @@ export default async function MyTastingsPage({ searchParams }: { searchParams: S
     let query = supabase
       .from("tastings")
       .select(
-        "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, created_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length",
+        "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, created_at, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, tags",
         { count: "exact" },
       )
       .eq("user_id", user.id);

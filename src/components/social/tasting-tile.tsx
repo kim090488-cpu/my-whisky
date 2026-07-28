@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { LikeButton } from "@/components/social/like-button";
+import { TagChips } from "@/components/tag-input";
 import { tastingPhotoUrl, bottlingImageUrl } from "@/lib/uploads/storage";
 import { COUNTRY_FLAG } from "@/lib/format";
 import type { WhiskyCountry, TastingVisibility } from "@/types/database";
@@ -25,6 +26,7 @@ export type TastingTileData = {
   smoothness: number | null;
   complexity: number | null;
   finish_length: number | null;
+  tags: string[] | null;
   profile: {
     username: string;
     display_name: string | null;
@@ -228,6 +230,10 @@ export function TastingTile({
               </span>
             ))}
           </div>
+        )}
+
+        {(t.tags?.length ?? 0) > 0 && (
+          <TagChips tags={t.tags} max={3} />
         )}
 
         {/* Notes preview (single line) */}

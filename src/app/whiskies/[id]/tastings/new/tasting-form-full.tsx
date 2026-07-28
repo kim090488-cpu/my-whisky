@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { createTasting, updateTasting, deleteTasting } from "@/lib/tastings/actions";
 import { TastingPhotoPicker } from "@/components/upload/tasting-photo-picker";
+import { TagInput } from "@/components/tag-input";
 import type { TastingVisibility, RecommendedForKind } from "@/types/database";
 
 export type FormState = {
@@ -39,6 +40,9 @@ export type FormState = {
 
   // 보유 인증
   bottle_owned_verified: boolean;
+
+  // 자유 태그 (예: #피트 #입문)
+  tags: string[];
 };
 
 const todayLocal = () => {
@@ -71,6 +75,7 @@ const blankState = (): FormState => ({
   purchased_at_place: "",
   food_pairing: "",
   bottle_owned_verified: false,
+  tags: [],
 });
 
 const DRAFT_INTERVAL_MS = 5_000;
@@ -223,6 +228,7 @@ export function TastingFormFull({
     if (state.purchased_at_place) fd.set("purchased_at_place", state.purchased_at_place);
     if (state.food_pairing) fd.set("food_pairing", state.food_pairing);
     fd.set("bottle_owned_verified", state.bottle_owned_verified ? "true" : "false");
+    fd.set("tags", JSON.stringify(state.tags));
 
     startTransition(async () => {
       const res = isEdit
@@ -468,6 +474,11 @@ export function TastingFormFull({
           paths={state.photos}
           onChange={(paths) => set("photos", paths)}
         />
+      </Field>
+
+      {/* 자유 태그 */}
+      <Field label="태그" hint="자유롭게 · 예: #피트, #입문, #선물용 · 최대 10개">
+        <TagInput value={state.tags} onChange={(next) => set("tags", next)} />
       </Field>
 
       {/* 보유 인증 */}
