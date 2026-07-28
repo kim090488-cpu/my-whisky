@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/avatar";
-import { suspendUser, unsuspendUser } from "@/lib/admin/actions";
+import {
+  suspendUser as _suspendUser,
+  unsuspendUser as _unsuspendUser,
+} from "@/lib/admin/actions";
+
+type FormAction = (fd: FormData) => Promise<void>;
+const suspendUser = _suspendUser as unknown as FormAction;
+const unsuspendUser = _unsuspendUser as unknown as FormAction;
 
 export const dynamic = "force-dynamic";
 

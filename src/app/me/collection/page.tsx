@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { COLLECTION_LABEL, COUNTRY_FLAG, formatAge, formatAbv } from "@/lib/format";
-import { removeFromCollection } from "@/lib/collection/actions";
+import { removeFromCollection as _removeFromCollection } from "@/lib/collection/actions";
+import type { WhiskyCountry } from "@/types/database";
+
+const removeFromCollection = _removeFromCollection as unknown as (fd: FormData) => Promise<void>;
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +53,7 @@ export default async function MyCollectionPage() {
                   <div className="text-xs text-neutral-500">
                     {d && (
                       <>
-                        {COUNTRY_FLAG[d.country]} {d.name_kr ?? d.name} · {d.region ?? ""}
+                        {COUNTRY_FLAG[d.country as WhiskyCountry]} {d.name_kr ?? d.name} · {d.region ?? ""}
                       </>
                     )}
                   </div>

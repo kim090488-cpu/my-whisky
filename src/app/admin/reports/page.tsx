@@ -3,9 +3,20 @@ import { createClient } from "@/lib/supabase/server";
 import {
   REPORT_REASON_LABEL, REPORT_STATUS_LABEL, REPORT_TARGET_LABEL,
 } from "@/lib/reports/labels";
-import { updateReportStatus } from "@/lib/reports/actions";
-import { hideTasting, hideComment, suspendUser } from "@/lib/admin/actions";
+import { updateReportStatus as _updateReportStatus } from "@/lib/reports/actions";
+import {
+  hideTasting as _hideTasting,
+  hideComment as _hideComment,
+  suspendUser as _suspendUser,
+} from "@/lib/admin/actions";
 import type { ReportStatus, ReportTarget } from "@/types/database";
+
+// React 19 form action은 void 반환을 요구 — 서버 액션은 {ok|error} 반환하므로 캐스팅.
+type FormAction = (fd: FormData) => Promise<void>;
+const hideTasting = _hideTasting as unknown as FormAction;
+const hideComment = _hideComment as unknown as FormAction;
+const suspendUser = _suspendUser as unknown as FormAction;
+const updateReportStatus = _updateReportStatus as unknown as FormAction;
 
 export const dynamic = "force-dynamic";
 

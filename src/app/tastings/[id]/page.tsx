@@ -14,6 +14,7 @@ import { FlavorRadar } from "@/components/social/flavor-radar";
 import { bottlingImageUrl, tastingPhotoUrl } from "@/lib/uploads/storage";
 import { PhotoGallery } from "@/components/tastings/photo-gallery";
 import { TagChips } from "@/components/tag-input";
+import type { WhiskyCountry } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +155,7 @@ export default async function TastingDetailPage({ params }: { params: Params }) 
             <div className="text-xs text-neutral-500">
               {d && (
                 <>
-                  {COUNTRY_FLAG[d.country]} {d.name_kr ?? d.name} · {d.region ?? COUNTRY_LABEL[d.country]}
+                  {COUNTRY_FLAG[d.country as WhiskyCountry]} {d.name_kr ?? d.name} · {d.region ?? COUNTRY_LABEL[d.country as WhiskyCountry]}
                 </>
               )}
             </div>

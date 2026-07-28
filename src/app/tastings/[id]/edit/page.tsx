@@ -24,15 +24,10 @@ export default async function EditTastingPage({ params }: { params: Params }) {
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/tastings/${id}/edit`);
 
+  // select 컬럼이 25+가 되면 postgrest-js parser가 GenericStringError를 반환 — select("*")로 우회.
   const { data: t } = await supabase
     .from("tastings")
-    .select(
-      "id, bottling_id, user_id, score, notes, would_buy_again, value_for_money, recommended_for, " +
-        "tasted_at, color, visibility, photos, " +
-        "sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, " +
-        "purchase_price, purchase_currency, purchase_country, purchased_at_place, " +
-        "food_pairing, bottle_owned_verified, tags",
-    )
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (!t) notFound();

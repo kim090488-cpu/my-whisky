@@ -37,6 +37,7 @@ import {
 } from "@/lib/tastings/flavor-filters";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { WhiskyCountry } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -182,11 +183,7 @@ export default async function BottlingDetailPage({
       .limit(10),
     supabase
       .from("bottling_external_reviews")
-      .select(
-        "source_url, reviewer_a_name, reviewer_a_score, reviewer_b_name, reviewer_b_score, " +
-          "nose, palate, finish, conclusion_a, conclusion_b, " +
-          "price_per_liter, price_currency, flavour, image_url",
-      )
+      .select("*")
       .eq("bottling_id", id)
       .eq("source", "whisky_edition")
       .maybeSingle(),
@@ -329,7 +326,7 @@ export default async function BottlingDetailPage({
           <div className="flex items-baseline gap-2 text-sm text-muted-foreground">
             {d && (
               <>
-                <span>{COUNTRY_FLAG[d.country]}</span>
+                <span>{COUNTRY_FLAG[d.country as WhiskyCountry]}</span>
                 <Link href={`/distilleries/${d.id}`} className="transition-colors hover:text-foreground">
                   {d.name_kr ?? d.name}
                   {d.name_kr && d.name_kr !== d.name && (
@@ -337,7 +334,7 @@ export default async function BottlingDetailPage({
                   )}
                 </Link>
                 <span className="text-border">·</span>
-                <span>{d.region ?? COUNTRY_LABEL[d.country]}</span>
+                <span>{d.region ?? COUNTRY_LABEL[d.country as WhiskyCountry]}</span>
               </>
             )}
           </div>

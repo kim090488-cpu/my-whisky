@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { COUNTRY_FLAG } from "@/lib/format";
 import { TastingFormFull } from "./tasting-form-full";
+import type { WhiskyCountry } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function NewTastingPage({ params }: { params: Params }) {
       <div className="mt-4 mb-8">
         {d && (
           <div className="text-sm text-neutral-400">
-            {COUNTRY_FLAG[d.country]} {d.name_kr ?? d.name}
+            {COUNTRY_FLAG[d.country as WhiskyCountry]} {d.name_kr ?? d.name}
             {d.region && ` · ${d.region}`}
           </div>
         )}

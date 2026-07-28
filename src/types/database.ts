@@ -241,7 +241,15 @@ export interface Database {
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["bottlings"]["Insert"]>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "bottlings_distillery_id_fkey";
+            columns: ["distillery_id"];
+            isOneToOne: false;
+            referencedRelation: "distilleries";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       tasting_likes: {
         Row: {
@@ -586,7 +594,15 @@ export interface Database {
           notes?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["collection_items"]["Insert"]>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "collection_items_bottling_id_fkey";
+            columns: ["bottling_id"];
+            isOneToOne: false;
+            referencedRelation: "bottlings";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       // ── 2026-07-04 이후 추가 테이블 ──
       bottling_edits: {
