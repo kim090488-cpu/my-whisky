@@ -346,6 +346,13 @@ export default async function BottlingDetailPage({
             <h1 className="font-serif text-4xl leading-tight tracking-tight">{b.name_kr ?? b.name}</h1>
             <div className="flex shrink-0 items-center gap-2 self-start">
               <Link
+                href={`/whiskies/compare?a=${b.id}`}
+                className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                title="다른 위스키와 비교"
+              >
+                비교
+              </Link>
+              <Link
                 href={`/whiskies/${b.id}/history`}
                 className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
                 title="이 보틀링의 수정 이력"

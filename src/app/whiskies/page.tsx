@@ -87,6 +87,13 @@ export default async function WhiskiesPage({ searchParams }: { searchParams: Sea
               <Plus className="size-3.5" />
               새 보틀링 추가
             </Link>
+            <span className="text-border">·</span>
+            <Link
+              href="/whiskies/compare"
+              className="text-primary transition-opacity hover:opacity-80"
+            >
+              비교
+            </Link>
           </div>
         </div>
 
