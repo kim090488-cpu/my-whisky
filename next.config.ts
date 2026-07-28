@@ -2,25 +2,8 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-function buildCsp(): string {
-  const supabaseConnect = ["https://*.supabase.co", "wss://*.supabase.co"].join(" ");
-  return [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
-    "font-src 'self' data:",
-    `connect-src 'self' ${supabaseConnect}`,
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "object-src 'none'",
-    "upgrade-insecure-requests",
-  ].join("; ");
-}
-
+// Content-Security-Policy는 per-request nonce 필요 → src/lib/supabase/middleware.ts에서 발급.
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: buildCsp() },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
