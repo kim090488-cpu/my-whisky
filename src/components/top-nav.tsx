@@ -42,6 +42,7 @@ export async function TopNav() {
           <NavLink href="/distilleries">증류소</NavLink>
           <NavLink href="/ranking">랭킹</NavLink>
           <NavLink href="/picks">추천</NavLink>
+          <NavLink href="/curator">큐레이터</NavLink>
         </div>
 
         <div className="ml-auto flex flex-1 items-center justify-end gap-3">

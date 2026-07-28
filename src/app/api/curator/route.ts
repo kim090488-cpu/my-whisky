@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { loadTasteProfile } from "@/lib/tastings/taste-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,14 @@ const SYSTEM_PROMPT = `당신은 my-whisky 앱의 전용 위스키 큐레이터�
 - 카탈로그에 없는 위스키를 추천할 때는 "저희 앱에는 아직 등록되지 않았지만…"이라고 부드럽게 알림
 - 카탈로그 이름을 정확히 그대로 사용 (예: "맥켈란 12년 셰리 오크" — 임의로 축약 X)
 
+## 중요: 유저 취향 컨텍스트
+
+**세 번째 시스템 블록** (있을 때)에 유저의 취향 태그·최근 마신 위스키가 있습니다. 답변 시:
+- 유저가 이미 마셔본 위스키는 다시 추천하지 말고 "이미 마신 것 같으니 비슷한 스타일로…" 식으로 옆으로 확장
+- 취향 태그를 참고해 유저가 좋아할 만한 걸 우선. 단 "이 유저는 XX 러버니까" 같이 티나게 X — 자연스럽게 취향 반영
+- 유저가 명시적으로 "새로운 스타일"이나 "취향과 다른 것"을 요청하면 태그에 없는 걸로 추천
+- 세 번째 블록이 없거나 노트 5개 미만이면 취향 판단 X (일반 추천으로)
+
 ## 대화 예시 (스타일 참고)
 
 Q: "5만원대 부드러운 위스키 추천"
@@ -210,18 +219,84 @@ export async function POST(request: Request) {
       }).join("\n")}`
     : "## my-whisky 앱 카탈로그\n\n(등록된 위스키 없음)";
 
+  // 유저 취향 컨텍스트 (병렬 로드)
+  const [tasteProfile, recentRes] = await Promise.all([
+    loadTasteProfile(supabase, user.id, { publicOnly: false }).catch(() => null),
+    supabase
+      .from("tastings")
+      .select("bottling_id, score, notes, tasted_at")
+      .eq("user_id", user.id)
+      .order("tasted_at", { ascending: false })
+      .limit(10),
+  ]);
+
+  type RecentRow = { bottling_id: string; score: number | null; notes: string | null; tasted_at: string };
+  const recentRows = (recentRes.data ?? []) as RecentRow[];
+  const uniqueRecentBottlingIds = Array.from(new Set(recentRows.map((r) => r.bottling_id)));
+  const recentBottlingsById = new Map<string, { name: string; name_kr: string | null }>();
+  if (uniqueRecentBottlingIds.length > 0) {
+    const { data: bs } = await supabase
+      .from("bottlings")
+      .select("id, name, name_kr")
+      .in("id", uniqueRecentBottlingIds);
+    for (const b of ((bs ?? []) as Array<{ id: string; name: string; name_kr: string | null }>)) {
+      recentBottlingsById.set(b.id, { name: b.name, name_kr: b.name_kr });
+    }
+  }
+
+  const hasUserContext =
+    (tasteProfile !== null && (tasteProfile.total >= 5 || tasteProfile.tags.length > 0)) ||
+    recentRows.length > 0;
+
+  let userContextText = "";
+  if (hasUserContext) {
+    const lines: string[] = ["## 유저 취향 컨텍스트"];
+    if (tasteProfile && tasteProfile.total > 0) {
+      lines.push(`- 총 노트: ${tasteProfile.total}개${tasteProfile.avgScore !== null ? ` · 평균 점수 ${tasteProfile.avgScore}` : ""}`);
+      if (tasteProfile.tags.length > 0) {
+        lines.push(`- 취향 태그: ${tasteProfile.tags.map((t) => t.label).join(", ")}`);
+      }
+    }
+    if (recentRows.length > 0) {
+      lines.push("", "### 최근 시음 (재추천 지양)");
+      const shown = recentRows.slice(0, 5);
+      for (const r of shown) {
+        const b = recentBottlingsById.get(r.bottling_id);
+        const name = b ? (b.name_kr ?? b.name) : "(알 수 없는 보틀링)";
+        const scoreStr = r.score !== null ? ` · ${r.score}점` : "";
+        const notePreview = r.notes ? ` — ${r.notes.slice(0, 60).replace(/\s+/g, " ").trim()}${r.notes.length > 60 ? "…" : ""}` : "";
+        lines.push(`- ${name}${scoreStr}${notePreview}`);
+      }
+      const alreadyTastedNames = uniqueRecentBottlingIds
+        .map((id) => recentBottlingsById.get(id))
+        .filter((b): b is { name: string; name_kr: string | null } => !!b)
+        .map((b) => b.name_kr ?? b.name);
+      if (alreadyTastedNames.length > 5) {
+        lines.push("", `### 이미 마신 위스키 전체 (${alreadyTastedNames.length}종 · 재추천 지양)`);
+        lines.push(alreadyTastedNames.join(", "));
+      }
+    }
+    userContextText = lines.join("\n");
+  }
+
   const client = new Anthropic({ apiKey });
   try {
+    // Prompt caching: 최대 3개의 cache_control block
+    //   1. SYSTEM_PROMPT — 거의 정적 (수동 코드 수정 시만 변경)
+    //   2. catalogText — 5분 TTL 안에서 재사용
+    //   3. userContextText — 유저별 · 같은 유저 반복 질문 시 5분간 히트
+    const system: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
+      { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      { type: "text", text: catalogText, cache_control: { type: "ephemeral" } },
+    ];
+    if (userContextText) {
+      system.push({ type: "text", text: userContextText, cache_control: { type: "ephemeral" } });
+    }
+
     const resp = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 800,
-      // Prompt caching: 두 개의 cache_control block
-      //   1. SYSTEM_PROMPT — 거의 정적 (수동 코드 수정 시만 변경)
-      //   2. catalogText — 5분 TTL 안에서 재사용
-      system: [
-        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-        { type: "text", text: catalogText, cache_control: { type: "ephemeral" } },
-      ],
+      system,
       messages: trimmed,
     });
     const text = resp.content
@@ -240,6 +315,7 @@ export async function POST(request: Request) {
       output: usage.output_tokens,
       cache_write: usage.cache_creation_input_tokens ?? 0,
       cache_read: usage.cache_read_input_tokens ?? 0,
+      personalized: !!userContextText,
     }));
 
     // 답변에 언급된 위스키 매칭 — 카탈로그의 name/name_kr substring 검색
