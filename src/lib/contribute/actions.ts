@@ -148,6 +148,7 @@ export async function createBottling(formData: FormData) {
 
   const distilleryIdRaw = String(formData.get("distillery_id") ?? "").trim();
   const distilleryId = distilleryIdRaw.length > 0 ? distilleryIdRaw : null;
+  if (!distilleryId) return { error: "증류소를 선택해주세요." };
   const name_kr = trimOrNull(formData.get("name_kr"));
   const nameRaw = String(formData.get("name") ?? "").trim();
   if (!name_kr) return { error: "보틀링 한글 이름을 입력해주세요." };
@@ -241,6 +242,7 @@ export async function updateBottling(bottlingId: string, formData: FormData) {
 
   const distilleryIdRaw = String(formData.get("distillery_id") ?? "").trim();
   const distilleryId = distilleryIdRaw.length > 0 ? distilleryIdRaw : null;
+  if (!distilleryId) return { error: "증류소를 선택해주세요." };
   const name_kr = trimOrNull(formData.get("name_kr"));
   const nameRaw = String(formData.get("name") ?? "").trim();
   if (!name_kr) return { error: "보틀링 한글 이름을 입력해주세요." };

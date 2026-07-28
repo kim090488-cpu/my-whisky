@@ -33,7 +33,7 @@ export function BottlingGallery({ images, currentUserId }: Props) {
           <img src={heroUrl} alt={hero.caption ?? ""} className="h-full w-full object-contain" />
         )}
         {currentUserId && hero.uploaded_by === currentUserId && (
-          <form action={deleteBottlingImage} className="absolute right-2 top-2">
+          <form action={deleteBottlingImage as unknown as (fd: FormData) => Promise<void>} className="absolute right-2 top-2">
             <input type="hidden" name="image_id" value={hero.id} />
             <button className="rounded-md bg-black/60 px-2 py-1 text-[10px] text-foreground/80 backdrop-blur transition-colors hover:bg-destructive/80 hover:text-foreground">
               내 사진 삭제
@@ -56,7 +56,7 @@ export function BottlingGallery({ images, currentUserId }: Props) {
                   <img src={url} alt={img.caption ?? ""} className="h-full w-full object-cover" />
                 )}
                 {currentUserId && img.uploaded_by === currentUserId && (
-                  <form action={deleteBottlingImage} className="absolute right-0.5 top-0.5">
+                  <form action={deleteBottlingImage as unknown as (fd: FormData) => Promise<void>} className="absolute right-0.5 top-0.5">
                     <input type="hidden" name="image_id" value={img.id} />
                     <button className="rounded bg-black/60 px-1 text-[9px] text-foreground/80 transition-colors hover:bg-destructive/80 hover:text-foreground">
                       ×

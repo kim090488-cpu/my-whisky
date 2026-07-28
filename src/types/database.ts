@@ -1,4 +1,5 @@
-// init_schema.sql 과 동기. 추후 `npx supabase gen types typescript --linked` 으로 자동 생성 교체.
+// init_schema.sql + 마이그레이션 동기. `supabase gen types typescript --linked`로 재생성 대체 가능.
+// @supabase/postgrest-js v2 요구사항: 각 Table에 Relationships: [] + Views 최상위 분리 필수 (없으면 select 결과가 never로 추론).
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -23,6 +24,7 @@ export type AdminActionType =
   | "hide_tasting" | "unhide_tasting"
   | "hide_comment" | "unhide_comment"
   | "suspend_user" | "unsuspend_user";
+export type CommunityCategory = "question" | "recommendation" | "tip" | "free";
 
 export interface Database {
   public: {
@@ -40,6 +42,9 @@ export interface Database {
           notify_like: boolean;
           notify_comment: boolean;
           notify_follow: boolean;
+          suspended_at: string | null;
+          suspended_until: string | null;
+          suspension_reason: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -53,7 +58,12 @@ export interface Database {
           notify_comment?: boolean;
           notify_follow?: boolean;
         };
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]> & {
+          suspended_at?: string | null;
+          suspended_until?: string | null;
+          suspension_reason?: string | null;
+        };
+        Relationships: [];
       };
       follows: {
         Row: {
@@ -66,7 +76,8 @@ export interface Database {
           follower_id: string;
           followee_id: string;
         };
-        Update: never;
+        Update: Partial<Database["public"]["Tables"]["follows"]["Insert"]>;
+        Relationships: [];
       };
       distilleries: {
         Row: {
@@ -103,6 +114,7 @@ export interface Database {
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["distilleries"]["Insert"]>;
+        Relationships: [];
       };
       currency_rates: {
         Row: {
@@ -116,6 +128,7 @@ export interface Database {
           fetched_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["currency_rates"]["Insert"]>;
+        Relationships: [];
       };
       bottling_external_reviews: {
         Row: {
@@ -159,6 +172,7 @@ export interface Database {
           fetched_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["bottling_external_reviews"]["Insert"]>;
+        Relationships: [];
       };
       distillery_auction_stats: {
         Row: {
@@ -184,6 +198,7 @@ export interface Database {
           fetched_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["distillery_auction_stats"]["Insert"]>;
+        Relationships: [];
       };
       bottlings: {
         Row: {
@@ -226,6 +241,7 @@ export interface Database {
           created_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["bottlings"]["Insert"]>;
+        Relationships: [];
       };
       tasting_likes: {
         Row: {
@@ -238,7 +254,8 @@ export interface Database {
           tasting_id: string;
           user_id: string;
         };
-        Update: never;
+        Update: Partial<Database["public"]["Tables"]["tasting_likes"]["Insert"]>;
+        Relationships: [];
       };
       tasting_comments: {
         Row: {
@@ -249,6 +266,9 @@ export interface Database {
           body: string;
           created_at: string;
           updated_at: string;
+          hidden_at: string | null;
+          hidden_by: string | null;
+          hidden_reason: string | null;
         };
         Insert: {
           tasting_id: string;
@@ -256,7 +276,13 @@ export interface Database {
           parent_id?: string | null;
           body: string;
         };
-        Update: Partial<{ body: string }>;
+        Update: Partial<{
+          body: string;
+          hidden_at: string | null;
+          hidden_by: string | null;
+          hidden_reason: string | null;
+        }>;
+        Relationships: [];
       };
       posts: {
         Row: {
@@ -269,6 +295,7 @@ export interface Database {
           location_name: string | null;
           like_count: number;
           comment_count: number;
+          tags: string[];
           created_at: string;
           updated_at: string;
         };
@@ -279,8 +306,10 @@ export interface Database {
           visibility?: PostVisibility;
           bottling_id?: string | null;
           location_name?: string | null;
+          tags?: string[];
         };
         Update: Partial<Database["public"]["Tables"]["posts"]["Insert"]>;
+        Relationships: [];
       };
       post_likes: {
         Row: {
@@ -293,7 +322,8 @@ export interface Database {
           post_id: string;
           user_id: string;
         };
-        Update: never;
+        Update: Partial<Database["public"]["Tables"]["post_likes"]["Insert"]>;
+        Relationships: [];
       };
       post_comments: {
         Row: {
@@ -312,6 +342,7 @@ export interface Database {
           body: string;
         };
         Update: Partial<{ body: string }>;
+        Relationships: [];
       };
       tastings: {
         Row: {
@@ -328,11 +359,9 @@ export interface Database {
           comment_count: number;
           created_at: string;
           updated_at: string;
-          // v2: verdict 신호
           would_buy_again: boolean | null;
-          value_for_money: number | null;          // 1-5
+          value_for_money: number | null;
           recommended_for: RecommendedForKind[] | null;
-          // flavor wheel (1-10)
           sweetness: number | null;
           smokiness: number | null;
           fruitiness: number | null;
@@ -340,13 +369,16 @@ export interface Database {
           smoothness: number | null;
           complexity: number | null;
           finish_length: number | null;
-          // 구매 메타
           purchase_price: number | null;
-          purchase_currency: string | null;        // 'KRW' 'USD' ...
+          purchase_currency: string | null;
           purchase_country: string | null;
           purchased_at_place: string | null;
           bottle_owned_verified: boolean;
           food_pairing: string | null;
+          tags: string[];
+          hidden_at: string | null;
+          hidden_by: string | null;
+          hidden_reason: string | null;
         };
         Insert: {
           user_id: string;
@@ -373,8 +405,14 @@ export interface Database {
           purchased_at_place?: string | null;
           bottle_owned_verified?: boolean;
           food_pairing?: string | null;
+          tags?: string[];
         };
-        Update: Partial<Database["public"]["Tables"]["tastings"]["Insert"]>;
+        Update: Partial<Database["public"]["Tables"]["tastings"]["Insert"]> & {
+          hidden_at?: string | null;
+          hidden_by?: string | null;
+          hidden_reason?: string | null;
+        };
+        Relationships: [];
       };
       notifications: {
         Row: {
@@ -390,8 +428,16 @@ export interface Database {
           error: string | null;
           created_at: string;
         };
-        Insert: never;
+        Insert: {
+          user_id: string;
+          kind: "like" | "comment" | "follow";
+          actor_id?: string | null;
+          target_table?: string | null;
+          target_id?: string | null;
+          payload?: Json | null;
+        };
         Update: Partial<{ read_at: string | null }>;
+        Relationships: [];
       };
       push_subscriptions: {
         Row: {
@@ -412,6 +458,7 @@ export interface Database {
           enabled?: boolean;
         };
         Update: Partial<{ enabled: boolean; last_seen_at: string; device_label: string | null }>;
+        Relationships: [];
       };
       admin_actions: {
         Row: {
@@ -434,7 +481,8 @@ export interface Database {
           reason?: string | null;
           metadata?: Json | null;
         };
-        Update: never;
+        Update: Partial<Database["public"]["Tables"]["admin_actions"]["Insert"]>;
+        Relationships: [];
       };
       reports: {
         Row: {
@@ -463,6 +511,7 @@ export interface Database {
           resolved_at: string | null;
           resolution_note: string | null;
         }>;
+        Relationships: [];
       };
       bottling_images: {
         Row: {
@@ -482,6 +531,7 @@ export interface Database {
           uploaded_by?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["bottling_images"]["Insert"]>;
+        Relationships: [];
       };
       price_records: {
         Row: {
@@ -507,6 +557,7 @@ export interface Database {
           recorded_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["price_records"]["Insert"]>;
+        Relationships: [];
       };
       collection_items: {
         Row: {
@@ -535,6 +586,133 @@ export interface Database {
           notes?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["collection_items"]["Insert"]>;
+        Relationships: [];
+      };
+      // ── 2026-07-04 이후 추가 테이블 ──
+      bottling_edits: {
+        Row: {
+          id: string;
+          bottling_id: string;
+          edited_by: string | null;
+          edited_at: string;
+          before: Json;
+          like_count: number;
+          report_count: number;
+        };
+        Insert: never; // 트리거로만 insert
+        Update: never;
+        Relationships: [];
+      };
+      bottling_edit_likes: {
+        Row: {
+          id: string;
+          edit_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          edit_id: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["bottling_edit_likes"]["Insert"]>;
+        Relationships: [];
+      };
+      bottling_edit_reports: {
+        Row: {
+          id: string;
+          edit_id: string;
+          user_id: string;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          edit_id: string;
+          user_id: string;
+          reason?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["bottling_edit_reports"]["Insert"]>;
+        Relationships: [];
+      };
+      // ── 2026-07-25 이후 추가 테이블 (커뮤니티·차단·뱃지) ──
+      community_posts: {
+        Row: {
+          id: string;
+          user_id: string;
+          category: CommunityCategory;
+          title: string;
+          body: string;
+          like_count: number;
+          comment_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          category?: CommunityCategory;
+          title: string;
+          body: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["community_posts"]["Insert"]>;
+        Relationships: [];
+      };
+      community_post_comments: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          body: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          post_id: string;
+          user_id: string;
+          body: string;
+        };
+        Update: Partial<{ body: string }>;
+        Relationships: [];
+      };
+      community_post_likes: {
+        Row: {
+          id: string;
+          post_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          post_id: string;
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["community_post_likes"]["Insert"]>;
+        Relationships: [];
+      };
+      user_blocks: {
+        Row: {
+          id: string;
+          blocker_id: string;
+          blocked_id: string;
+          created_at: string;
+        };
+        Insert: {
+          blocker_id: string;
+          blocked_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_blocks"]["Insert"]>;
+        Relationships: [];
+      };
+      user_badges: {
+        Row: {
+          id: string;
+          user_id: string;
+          code: string;
+          earned_at: string;
+        };
+        Insert: {
+          user_id: string;
+          code: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_badges"]["Insert"]>;
+        Relationships: [];
       };
     };
     Views: {
@@ -557,12 +735,10 @@ export interface Database {
           distillery_status: DistilleryStatus;
           avg_score: number | null;
           tasting_count: number;
-          // v2: verdict 신호
           avg_value_for_money: number | null;
-          buy_again_pct: number | null;            // 0-100
+          buy_again_pct: number | null;
         };
-        Insert: never;
-        Update: never;
+        Relationships: [];
       };
       bottling_verdict_stats: {
         Row: {
@@ -588,8 +764,7 @@ export interface Database {
           price_data_count: number;
           avg_score: number | null;
         };
-        Insert: never;
-        Update: never;
+        Relationships: [];
       };
       trending_tastings: {
         Row: {
@@ -604,8 +779,7 @@ export interface Database {
           visibility: TastingVisibility;
           recent_likes: number;
         };
-        Insert: never;
-        Update: never;
+        Relationships: [];
       };
       top_reviewers: {
         Row: {
@@ -618,8 +792,7 @@ export interface Database {
           total_likes_received: number;
           avg_score: number | null;
         };
-        Insert: never;
-        Update: never;
+        Relationships: [];
       };
       popular_distilleries: {
         Row: {
@@ -633,8 +806,7 @@ export interface Database {
           avg_score: number | null;
           bottling_count: number;
         };
-        Insert: never;
-        Update: never;
+        Relationships: [];
       };
     };
     Functions: Record<string, never>;
@@ -647,6 +819,8 @@ export interface Database {
       tasting_visibility: TastingVisibility;
       post_visibility: PostVisibility;
       recommended_for_kind: RecommendedForKind;
+      community_category: CommunityCategory;
     };
+    CompositeTypes: Record<string, never>;
   };
 }

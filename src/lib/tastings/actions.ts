@@ -130,7 +130,7 @@ export async function createTasting(formData: FormData) {
   if (!bottlingId) return { error: "보틀링 정보가 누락됐습니다." };
 
   const parsed = parseTastingFields(formData);
-  if (parsed.error) return { error: parsed.error };
+  if (parsed.error !== null) return { error: parsed.error };
   const f = parsed.data;
 
   const { tasted_at, ...rest } = f;
@@ -170,7 +170,7 @@ export async function updateTasting(tastingId: string, formData: FormData) {
   }
 
   const parsed = parseTastingFields(formData);
-  if (parsed.error) return { error: parsed.error };
+  if (parsed.error !== null) return { error: parsed.error };
   const f = parsed.data;
 
   const { tasted_at, ...rest } = f;

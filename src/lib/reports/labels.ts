@@ -19,4 +19,5 @@ export const REPORT_TARGET_LABEL: Record<ReportTarget, string> = {
   tasting: "테이스팅 노트",
   comment: "댓글",
   user: "사용자",
+  bottling: "위스키",
 };

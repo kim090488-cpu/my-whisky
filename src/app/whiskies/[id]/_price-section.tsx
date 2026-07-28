@@ -102,7 +102,7 @@ export function PriceSection({ bottlingId, records, currentUserId }: Props) {
                 </a>
               )}
               {currentUserId && r.user_id === currentUserId && (
-                <form action={deletePriceRecord}>
+                <form action={deletePriceRecord as unknown as (fd: FormData) => Promise<void>}>
                   <input type="hidden" name="id" value={r.id} />
                   <button className="text-[10px] text-neutral-600 hover:text-red-400">삭제</button>
                 </form>
