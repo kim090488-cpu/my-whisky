@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/avatar";
 import { FollowButton } from "@/components/social/follow-button";
 import { ReportButton } from "@/components/social/report-button";
+import { BlockButton } from "@/components/social/block-button";
+import { isBlockedByViewer } from "@/lib/social/blocks";
+import { BadgeStrip } from "@/components/social/badge-strip";
+import type { UserBadgeRow } from "@/lib/badges";
 import { NotesFilterBar } from "@/components/social/notes-filter-bar";
 import { TastingTile, type TastingTileData } from "@/components/social/tasting-tile";
 import { postPhotoUrl } from "@/lib/uploads/storage";
@@ -74,20 +78,25 @@ export default async function PublicProfilePage({
   const isSelf = user?.id === profile.id;
 
   let isFollowing = false;
+  let isBlocked = false;
   if (user && !isSelf) {
-    const { data: follow } = await supabase
-      .from("follows")
-      .select("id")
-      .eq("follower_id", user.id)
-      .eq("followee_id", profile.id)
-      .maybeSingle();
-    isFollowing = !!follow;
+    const [followRes, blockedRes] = await Promise.all([
+      supabase
+        .from("follows")
+        .select("id")
+        .eq("follower_id", user.id)
+        .eq("followee_id", profile.id)
+        .maybeSingle(),
+      isBlockedByViewer(supabase, user.id, profile.id),
+    ]);
+    isFollowing = !!followRes.data;
+    isBlocked = blockedRes;
   }
 
   let tastingsQuery = supabase
     .from("tastings")
     .select(
-      "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length",
+      "id, tasted_at, score, notes, photos, visibility, user_id, bottling_id, like_count, comment_count, would_buy_again, value_for_money, sweetness, smokiness, fruitiness, spiciness, smoothness, complexity, finish_length, tags",
       { count: "exact" },
     )
     .eq("user_id", profile.id);
@@ -197,6 +206,13 @@ export default async function PublicProfilePage({
     collectionCount = count ?? 0;
   }
 
+  const { data: badgeRows } = await supabase
+    .from("user_badges")
+    .select("code, earned_at")
+    .eq("user_id", profile.id)
+    .order("earned_at", { ascending: false });
+  const badges = (badgeRows ?? []) as UserBadgeRow[];
+
   // 모먼트 (인스타식 포스트) — RLS가 visibility 처리
   let postsQuery = supabase
     .from("posts")
@@ -227,9 +243,17 @@ export default async function PublicProfilePage({
               </Link>
             ) : (
               <div className="flex items-center gap-2">
-                <FollowButton
-                  followeeId={profile.id}
-                  initialFollowing={isFollowing}
+                {!isBlocked && (
+                  <FollowButton
+                    followeeId={profile.id}
+                    initialFollowing={isFollowing}
+                    currentUserId={user?.id ?? null}
+                    loginHref={`/login?next=/profile/${profile.username}`}
+                  />
+                )}
+                <BlockButton
+                  targetUserId={profile.id}
+                  initialBlocked={isBlocked}
                   currentUserId={user?.id ?? null}
                   loginHref={`/login?next=/profile/${profile.username}`}
                 />
@@ -272,12 +296,27 @@ export default async function PublicProfilePage({
         </div>
       </header>
 
+      {isBlocked && (
+        <div className="mt-6 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          차단한 사용자입니다. 상단 &quot;차단됨&quot; 버튼으로 차단을 해제할 수 있어요.
+        </div>
+      )}
+
       <section className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label={isSelf ? "내 노트" : "공개 노트"} value={(noteCount ?? 0).toLocaleString()} />
         <Stat label="모먼트" value={(postCount ?? 0).toLocaleString()} />
         <Stat label="평균 점수" value={avgScore !== null ? `${avgScore}` : "—"} accent />
         {collectionCount !== null && <Stat label="내 컬렉션" value={collectionCount.toLocaleString()} />}
       </section>
+
+      {badges.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            뱃지
+          </h2>
+          <BadgeStrip badges={badges} displayName={displayName} />
+        </section>
+      )}
 
       {(tasteProfile.tags.length > 0 || (isSelf && tasteProfile.total > 0)) && (
         <section className="mt-6">
