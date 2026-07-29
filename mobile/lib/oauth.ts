@@ -10,10 +10,11 @@ type Result =
 
 // Supabase OAuth PKCE. authorization URL을 시스템 브라우저로 열어서
 // 카카오톡 앱 딥링크(kakaotalk://)까지 지원. 콜백은 app/auth/callback.tsx가 처리
-//   redirect URL: production `mywhisky://auth/callback`, dev `exp://<ip>:8081/--/auth/callback`
-//   Supabase URL Configuration의 Redirect URLs에 두 형태 모두 등록 필요
+//   redirect URL: `mywhisky://auth/callback` (하드코딩)
+//   Linking.createURL()는 dev 모드에서 exp://<ip>:8081/--/... 로 나가는데
+//   chrome이 exp:// 스킴을 처리 못해 Site URL로 fallback → 웹으로 이동. 하드코딩으로 우회.
 export async function signInWithProvider(provider: OAuthProvider): Promise<Result> {
-  const redirectTo = Linking.createURL("auth/callback");
+  const redirectTo = "mywhisky://auth/callback";
   console.log("[oauth] provider:", provider, "redirectTo:", redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({

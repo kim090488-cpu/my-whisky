@@ -49,3 +49,8 @@ supabase/.temp
 
 # claude code local settings (contains permissions cache and may include tokens)
 .claude/
+
+# Firebase/FCM service account keys (private keys — never commit)
+mobile/firebase-service-account*.json
+mobile/*-firebase-adminsdk-*.json
+mobile/google-services.json

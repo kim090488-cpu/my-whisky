@@ -23,7 +23,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0a0a"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-router",
@@ -47,10 +52,18 @@
         }
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "944295b7-dd42-4f51-ac39-b62ebe930c95"
+      }
+    },
+    "owner": "kimsunghun"
   }
 }
