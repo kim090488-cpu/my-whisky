@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { loadTasteProfile } from "@/lib/tastings/taste-profile";
 
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 // ────────────────────────────────────────────────
@@ -279,8 +279,6 @@ export async function POST(request: Request) {
     userContextText = lines.join("\n");
   }
 
-  const client = new Anthropic({ apiKey });
-
   // Prompt caching: 최대 3개의 cache_control block
   //   1. SYSTEM_PROMPT — 거의 정적 (수동 코드 수정 시만 변경)
   //   2. catalogText — 5분 TTL 안에서 재사용
@@ -300,37 +298,78 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
       try {
-        const anthropicStream = client.messages.stream({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 800,
-          system,
-          messages: trimmed,
+        // Anthropic SDK 대신 fetch 직접 호출 — SDK v0.106의 tools/memory가 node:fs 참조해서 edge runtime 불가
+        const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 800,
+            system,
+            messages: trimmed,
+            stream: true,
+          }),
         });
 
-        let fullText = "";
-        for await (const event of anthropicStream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            const chunk = event.delta.text;
-            fullText += chunk;
-            send("delta", { text: chunk });
-          }
+        if (!anthropicRes.ok || !anthropicRes.body) {
+          const errText = await anthropicRes.text().catch(() => "");
+          throw new Error(`Anthropic ${anthropicRes.status}: ${errText.slice(0, 200)}`);
         }
 
-        const finalMessage = await anthropicStream.finalMessage();
-        const usage = finalMessage.usage as unknown as {
+        type Usage = {
           input_tokens: number;
           output_tokens: number;
           cache_creation_input_tokens?: number;
           cache_read_input_tokens?: number;
         };
+        let fullText = "";
+        let usage: Usage | null = null;
+
+        const reader = anthropicRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let sepIdx: number;
+          while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
+            const rawEvent = buffer.slice(0, sepIdx);
+            buffer = buffer.slice(sepIdx + 2);
+            let dataStr = "";
+            for (const line of rawEvent.split("\n")) {
+              if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+            }
+            if (!dataStr) continue;
+            let payload: unknown;
+            try { payload = JSON.parse(dataStr); } catch { continue; }
+            const p = payload as { type?: string; delta?: { type?: string; text?: string }; message?: { usage?: Usage }; usage?: Partial<Usage> };
+            if (p.type === "content_block_delta" && p.delta?.type === "text_delta" && p.delta.text) {
+              fullText += p.delta.text;
+              send("delta", { text: p.delta.text });
+            } else if (p.type === "message_start" && p.message?.usage) {
+              usage = p.message.usage;
+            } else if (p.type === "message_delta" && p.usage) {
+              // message_delta의 usage는 output_tokens 최종값 포함
+              const patch = p.usage;
+              usage = { ...(usage ?? { input_tokens: 0, output_tokens: 0 }), ...patch };
+            }
+          }
+        }
+
         console.log("[curator]", JSON.stringify({
           user: user.id,
-          input: usage.input_tokens,
-          output: usage.output_tokens,
-          cache_write: usage.cache_creation_input_tokens ?? 0,
-          cache_read: usage.cache_read_input_tokens ?? 0,
+          input: usage?.input_tokens ?? 0,
+          output: usage?.output_tokens ?? 0,
+          cache_write: usage?.cache_creation_input_tokens ?? 0,
+          cache_read: usage?.cache_read_input_tokens ?? 0,
           personalized: !!userContextText,
           streamed: true,
+          runtime: "edge",
         }));
 
         // 답변에 언급된 위스키 매칭 — 카탈로그의 name/name_kr substring 검색
