@@ -95,6 +95,24 @@ export default function CuratorScreen() {
     let acc = "";
     let matches: WhiskyMatch[] = [];
 
+    // 16ms(약 60fps) 간격으로 델타 flush → 델타당 re-render 방지
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushNow = () => {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      setMessages((prev) => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last && last.role === "assistant" && last.content !== acc) {
+          copy[copy.length - 1] = { ...last, content: acc };
+        }
+        return copy;
+      });
+    };
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(flushNow, 16);
+    };
+
     try {
       const { data: { session: current } } = await supabase.auth.getSession();
       const token = current?.access_token;
@@ -129,18 +147,11 @@ export default function CuratorScreen() {
             let payload: unknown;
             try { payload = JSON.parse(dataStr); } catch { continue; }
             if (eventName === "delta") {
-              const chunk = (payload as { text?: string }).text ?? "";
-              acc += chunk;
-              setMessages((prev) => {
-                const copy = prev.slice();
-                const last = copy[copy.length - 1];
-                if (last && last.role === "assistant") {
-                  copy[copy.length - 1] = { ...last, content: acc };
-                }
-                return copy;
-              });
+              acc += (payload as { text?: string }).text ?? "";
+              scheduleFlush();
             } else if (eventName === "matches") {
               matches = (payload as { matches?: WhiskyMatch[] }).matches ?? [];
+              flushNow();
               setMessages((prev) => {
                 const copy = prev.slice();
                 const last = copy[copy.length - 1];
@@ -166,6 +177,7 @@ export default function CuratorScreen() {
           }
         };
         xhr.onload = () => {
+          flushNow();
           if (xhr.status >= 200 && xhr.status < 300) {
             if (streamError) reject(new Error(streamError));
             else resolve();
@@ -178,8 +190,8 @@ export default function CuratorScreen() {
             reject(new Error(msg));
           }
         };
-        xhr.onerror = () => reject(new Error("네트워크 오류"));
-        xhr.ontimeout = () => reject(new Error("요청 시간 초과"));
+        xhr.onerror = () => { flushNow(); reject(new Error("네트워크 오류")); };
+        xhr.ontimeout = () => { flushNow(); reject(new Error("요청 시간 초과")); };
         xhr.send(JSON.stringify({ messages: withUser }));
       });
 

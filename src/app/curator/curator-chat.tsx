@@ -82,6 +82,24 @@ export function CuratorChat({ userId }: { userId: string }) {
     let matches: WhiskyMatch[] = [];
     let streamError: string | null = null;
 
+    // 16ms(약 60fps) 간격으로 델타 flush → 델타당 re-render 방지
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushNow = () => {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      setMessages((prev) => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last && last.role === "assistant" && last.content !== acc) {
+          copy[copy.length - 1] = { ...last, content: acc };
+        }
+        return copy;
+      });
+    };
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(flushNow, 16);
+    };
+
     try {
       const res = await fetch("/api/curator", {
         method: "POST",
@@ -118,18 +136,11 @@ export function CuratorChat({ userId }: { userId: string }) {
           let payload: unknown;
           try { payload = JSON.parse(dataStr); } catch { continue; }
           if (eventName === "delta") {
-            const chunk = (payload as { text?: string }).text ?? "";
-            acc += chunk;
-            setMessages((prev) => {
-              const copy = prev.slice();
-              const last = copy[copy.length - 1];
-              if (last && last.role === "assistant") {
-                copy[copy.length - 1] = { ...last, content: acc };
-              }
-              return copy;
-            });
+            acc += (payload as { text?: string }).text ?? "";
+            scheduleFlush();
           } else if (eventName === "matches") {
             matches = (payload as { matches?: WhiskyMatch[] }).matches ?? [];
+            flushNow();
             setMessages((prev) => {
               const copy = prev.slice();
               const last = copy[copy.length - 1];
@@ -143,6 +154,7 @@ export function CuratorChat({ userId }: { userId: string }) {
           }
         }
       }
+      flushNow();
 
       if (streamError) {
         setError(streamError);
