@@ -86,35 +86,102 @@ export default function CuratorScreen() {
     }
     const q = (promptOverride ?? input).trim();
     if (!q || pending) return;
-    const next: Message[] = [...messages, { role: "user", content: q }];
-    setMessages(next);
+    const withUser: Message[] = [...messages, { role: "user", content: q }];
+    // 유저 bubble + 빈 assistant bubble 즉시 push (스트리밍 자리표시)
+    setMessages([...withUser, { role: "assistant", content: "" }]);
     setInput("");
     setPending(true);
+
+    let acc = "";
+    let matches: WhiskyMatch[] = [];
 
     try {
       const { data: { session: current } } = await supabase.auth.getSession();
       const token = current?.access_token;
-      const res = await fetch(`${API_BASE}/api/curator`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
-        },
-        body: JSON.stringify({ messages: next }),
+
+      await new Promise<void>((resolve, reject) => {
+        // RN에서 SSE 스트리밍: fetch body.getReader()는 Blob 기반이라 청크 단위로 즉시 오지 않음.
+        // XHR onprogress는 responseText가 누적되며 매 청크마다 fire → 프로그레시브 렌더 가능.
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${API_BASE}/api/curator`);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("Accept", "text/event-stream");
+        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+        if (anon) xhr.setRequestHeader("apikey", anon);
+
+        let processed = 0;
+        let buffer = "";
+        let streamError: string | null = null;
+
+        const processBuffer = () => {
+          let sepIdx: number;
+          while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
+            const rawEvent = buffer.slice(0, sepIdx);
+            buffer = buffer.slice(sepIdx + 2);
+            let eventName = "message";
+            let dataStr = "";
+            for (const line of rawEvent.split("\n")) {
+              if (line.startsWith("event:")) eventName = line.slice(6).trim();
+              else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+            }
+            if (!dataStr) continue;
+            let payload: unknown;
+            try { payload = JSON.parse(dataStr); } catch { continue; }
+            if (eventName === "delta") {
+              const chunk = (payload as { text?: string }).text ?? "";
+              acc += chunk;
+              setMessages((prev) => {
+                const copy = prev.slice();
+                const last = copy[copy.length - 1];
+                if (last && last.role === "assistant") {
+                  copy[copy.length - 1] = { ...last, content: acc };
+                }
+                return copy;
+              });
+            } else if (eventName === "matches") {
+              matches = (payload as { matches?: WhiskyMatch[] }).matches ?? [];
+              setMessages((prev) => {
+                const copy = prev.slice();
+                const last = copy[copy.length - 1];
+                if (last && last.role === "assistant") {
+                  copy[copy.length - 1] = { ...last, matches };
+                }
+                return copy;
+              });
+            } else if (eventName === "error") {
+              streamError = (payload as { error?: string }).error ?? "unknown error";
+            }
+          }
+        };
+
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === XMLHttpRequest.LOADING || xhr.readyState === XMLHttpRequest.DONE) {
+            const text = xhr.responseText ?? "";
+            if (text.length > processed) {
+              buffer += text.slice(processed);
+              processed = text.length;
+              processBuffer();
+            }
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            if (streamError) reject(new Error(streamError));
+            else resolve();
+          } else {
+            let msg = `HTTP ${xhr.status}`;
+            try {
+              const j = JSON.parse(xhr.responseText) as { error?: string };
+              if (j.error) msg = j.error;
+            } catch {}
+            reject(new Error(msg));
+          }
+        };
+        xhr.onerror = () => reject(new Error("네트워크 오류"));
+        xhr.ontimeout = () => reject(new Error("요청 시간 초과"));
+        xhr.send(JSON.stringify({ messages: withUser }));
       });
-      const json = await res.json() as { reply?: string; error?: string; matches?: WhiskyMatch[] };
-      if (!res.ok || json.error) {
-        Alert.alert("요청 실패", json.error ?? `HTTP ${res.status}`);
-        setMessages(next);
-        return;
-      }
-      const assistantMsg: Message = {
-        role: "assistant",
-        content: json.reply ?? "",
-        matches: json.matches ?? [],
-      };
-      setMessages([...next, assistantMsg]);
 
       // 성공 시 유저·assistant 메시지 DB 저장 (기기 간 동기화)
       if (userId) {
@@ -123,15 +190,14 @@ export default function CuratorScreen() {
           {
             user_id: userId,
             role: "assistant",
-            content: assistantMsg.content,
-            matches: assistantMsg.matches && assistantMsg.matches.length > 0
-              ? (assistantMsg.matches as unknown as never)
-              : null,
+            content: acc,
+            matches: matches.length > 0 ? (matches as unknown as never) : null,
           },
         ] as never);
       }
     } catch (e) {
-      Alert.alert("네트워크 오류", e instanceof Error ? e.message : String(e));
+      Alert.alert("요청 실패", e instanceof Error ? e.message : String(e));
+      setMessages(withUser);
     } finally {
       setPending(false);
     }
@@ -190,9 +256,13 @@ export default function CuratorScreen() {
             <View key={i} style={[styles.bubbleWrap, m.role === "user" ? styles.userWrap : styles.botWrap]}>
               <View style={{ flex: 1, alignItems: m.role === "user" ? "flex-end" : "flex-start" }}>
                 <View style={[styles.bubble, m.role === "user" ? styles.userBubble : styles.botBubble]}>
-                  <Text style={[styles.bubbleText, m.role === "user" ? styles.userText : styles.botText]}>
-                    {m.content}
-                  </Text>
+                  {m.role === "assistant" && m.content.length === 0 ? (
+                    <ActivityIndicator color="#fbbf24" size="small" />
+                  ) : (
+                    <Text style={[styles.bubbleText, m.role === "user" ? styles.userText : styles.botText]}>
+                      {m.content}
+                    </Text>
+                  )}
                 </View>
                 {m.role === "assistant" && m.matches && m.matches.length > 0 && (
                   <View style={styles.matchesWrap}>
@@ -221,13 +291,6 @@ export default function CuratorScreen() {
               </View>
             </View>
           ))
-        )}
-        {pending && (
-          <View style={[styles.bubbleWrap, styles.botWrap]}>
-            <View style={[styles.bubble, styles.botBubble]}>
-              <ActivityIndicator color="#fbbf24" size="small" />
-            </View>
-          </View>
         )}
       </ScrollView>
       <View style={[styles.inputRow, { paddingBottom: bottomPadding }]}>

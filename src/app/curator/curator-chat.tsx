@@ -71,34 +71,85 @@ export function CuratorChat({ userId }: { userId: string }) {
     const q = (promptOverride ?? input).trim();
     if (!q || pending) return;
     const userMsg: Message = { role: "user", content: q };
-    const next: Message[] = [...messages, userMsg];
-    setMessages(next);
+    const withUser: Message[] = [...messages, userMsg];
+    // 유저 bubble + 빈 assistant bubble 즉시 push (스트리밍 자리표시)
+    setMessages([...withUser, { role: "assistant", content: "" }]);
     setInput("");
     setError(null);
     setPending(true);
 
+    let acc = "";
+    let matches: WhiskyMatch[] = [];
+    let streamError: string | null = null;
+
     try {
       const res = await fetch("/api/curator", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+        body: JSON.stringify({ messages: withUser }),
       });
-      const json = (await res.json()) as {
-        reply?: string;
-        error?: string;
-        matches?: WhiskyMatch[];
-      };
-      if (!res.ok || json.error) {
-        setError(json.error ?? `HTTP ${res.status}`);
-        // 실패한 유저 메시지는 UI에서만 유지 (DB 저장 X — 재시도 가능)
+      if (!res.ok || !res.body) {
+        let msg = `HTTP ${res.status}`;
+        try {
+          const j = await res.json() as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let sepIdx: number;
+        while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, sepIdx);
+          buffer = buffer.slice(sepIdx + 2);
+          let eventName = "message";
+          let dataStr = "";
+          for (const line of rawEvent.split("\n")) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+          }
+          if (!dataStr) continue;
+          let payload: unknown;
+          try { payload = JSON.parse(dataStr); } catch { continue; }
+          if (eventName === "delta") {
+            const chunk = (payload as { text?: string }).text ?? "";
+            acc += chunk;
+            setMessages((prev) => {
+              const copy = prev.slice();
+              const last = copy[copy.length - 1];
+              if (last && last.role === "assistant") {
+                copy[copy.length - 1] = { ...last, content: acc };
+              }
+              return copy;
+            });
+          } else if (eventName === "matches") {
+            matches = (payload as { matches?: WhiskyMatch[] }).matches ?? [];
+            setMessages((prev) => {
+              const copy = prev.slice();
+              const last = copy[copy.length - 1];
+              if (last && last.role === "assistant") {
+                copy[copy.length - 1] = { ...last, matches };
+              }
+              return copy;
+            });
+          } else if (eventName === "error") {
+            streamError = (payload as { error?: string }).error ?? "unknown error";
+          }
+        }
+      }
+
+      if (streamError) {
+        setError(streamError);
+        // 실패 시 자리표시 assistant bubble 제거, 유저 bubble만 남김
+        setMessages(withUser);
         return;
       }
-      const assistantMsg: Message = {
-        role: "assistant",
-        content: json.reply ?? "",
-        matches: json.matches ?? [],
-      };
-      setMessages([...next, assistantMsg]);
 
       // 성공 시 유저·assistant 메시지 DB 저장
       const supabase = createClient();
@@ -107,14 +158,13 @@ export function CuratorChat({ userId }: { userId: string }) {
         {
           user_id: userId,
           role: "assistant",
-          content: assistantMsg.content,
-          matches: assistantMsg.matches && assistantMsg.matches.length > 0
-            ? (assistantMsg.matches as unknown as never)
-            : null,
+          content: acc,
+          matches: matches.length > 0 ? (matches as unknown as never) : null,
         },
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      setMessages(withUser);
     } finally {
       setPending(false);
     }
@@ -165,13 +215,6 @@ export function CuratorChat({ userId }: { userId: string }) {
         ) : (
           messages.map((m, i) => <Bubble key={i} message={m} />)
         )}
-        {pending && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-2.5">
-              <TypingDots />
-            </div>
-          </div>
-        )}
         {error && (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {error}
@@ -219,6 +262,7 @@ export function CuratorChat({ userId }: { userId: string }) {
 
 function Bubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const isEmptyAssistant = !isUser && message.content.length === 0;
   return (
     <div className={"flex " + (isUser ? "justify-end" : "justify-start")}>
       <div className={"flex max-w-[80%] flex-col gap-1.5 " + (isUser ? "items-end" : "items-start")}>
@@ -230,7 +274,7 @@ function Bubble({ message }: { message: Message }) {
               : "rounded-tl-sm border border-border bg-card text-foreground")
           }
         >
-          {message.content}
+          {isEmptyAssistant ? <TypingDots /> : message.content}
         </div>
         {!isUser && message.matches && message.matches.length > 0 && (
           <div className="flex max-w-full flex-col gap-1">

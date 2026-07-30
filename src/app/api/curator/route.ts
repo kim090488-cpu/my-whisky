@@ -280,83 +280,108 @@ export async function POST(request: Request) {
   }
 
   const client = new Anthropic({ apiKey });
-  try {
-    // Prompt caching: 최대 3개의 cache_control block
-    //   1. SYSTEM_PROMPT — 거의 정적 (수동 코드 수정 시만 변경)
-    //   2. catalogText — 5분 TTL 안에서 재사용
-    //   3. userContextText — 유저별 · 같은 유저 반복 질문 시 5분간 히트
-    const system: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
-      { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-      { type: "text", text: catalogText, cache_control: { type: "ephemeral" } },
-    ];
-    if (userContextText) {
-      system.push({ type: "text", text: userContextText, cache_control: { type: "ephemeral" } });
-    }
 
-    const resp = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 800,
-      system,
-      messages: trimmed,
-    });
-    const text = resp.content
-      .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    const usage = resp.usage as unknown as {
-      input_tokens: number;
-      output_tokens: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
-    console.log("[curator]", JSON.stringify({
-      user: user.id,
-      input: usage.input_tokens,
-      output: usage.output_tokens,
-      cache_write: usage.cache_creation_input_tokens ?? 0,
-      cache_read: usage.cache_read_input_tokens ?? 0,
-      personalized: !!userContextText,
-    }));
-
-    // 답변에 언급된 위스키 매칭 — 카탈로그의 name/name_kr substring 검색
-    const { data: bottlings } = await supabase
-      .from("bottlings")
-      .select("id, name, name_kr")
-      .limit(2000);
-    const answerLower = text.toLowerCase();
-    type Row = { id: string; name: string | null; name_kr: string | null };
-    const rows = (bottlings ?? []) as Row[];
-    const matchesMap = new Map<string, { id: string; name: string; name_kr: string | null; matched: string }>();
-    for (const b of rows) {
-      const candidates: Array<{ text: string; source: "kr" | "en" }> = [];
-      if (b.name_kr && b.name_kr.length >= 3) candidates.push({ text: b.name_kr, source: "kr" });
-      if (b.name && b.name.length >= 3) candidates.push({ text: b.name, source: "en" });
-      for (const c of candidates) {
-        if (answerLower.includes(c.text.toLowerCase())) {
-          if (!matchesMap.has(b.id)) {
-            matchesMap.set(b.id, {
-              id: b.id,
-              name: b.name ?? c.text,
-              name_kr: b.name_kr,
-              matched: c.text,
-            });
-          }
-          break;
-        }
-      }
-    }
-    // 이름 길이 긴 것 우선 (더 구체적인 이름이 정확할 확률 높음)
-    const matches = Array.from(matchesMap.values())
-      .sort((a, b) => b.matched.length - a.matched.length)
-      .slice(0, 5);
-
-    return NextResponse.json({ reply: text, matches }, {
-      headers: { "Cache-Control": "private, no-store" },
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Claude call failed" },
-      { status: 502 },
-    );
+  // Prompt caching: 최대 3개의 cache_control block
+  //   1. SYSTEM_PROMPT — 거의 정적 (수동 코드 수정 시만 변경)
+  //   2. catalogText — 5분 TTL 안에서 재사용
+  //   3. userContextText — 유저별 · 같은 유저 반복 질문 시 5분간 히트
+  const system: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
+    { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+    { type: "text", text: catalogText, cache_control: { type: "ephemeral" } },
+  ];
+  if (userContextText) {
+    system.push({ type: "text", text: userContextText, cache_control: { type: "ephemeral" } });
   }
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      };
+      try {
+        const anthropicStream = client.messages.stream({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 800,
+          system,
+          messages: trimmed,
+        });
+
+        let fullText = "";
+        for await (const event of anthropicStream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            const chunk = event.delta.text;
+            fullText += chunk;
+            send("delta", { text: chunk });
+          }
+        }
+
+        const finalMessage = await anthropicStream.finalMessage();
+        const usage = finalMessage.usage as unknown as {
+          input_tokens: number;
+          output_tokens: number;
+          cache_creation_input_tokens?: number;
+          cache_read_input_tokens?: number;
+        };
+        console.log("[curator]", JSON.stringify({
+          user: user.id,
+          input: usage.input_tokens,
+          output: usage.output_tokens,
+          cache_write: usage.cache_creation_input_tokens ?? 0,
+          cache_read: usage.cache_read_input_tokens ?? 0,
+          personalized: !!userContextText,
+          streamed: true,
+        }));
+
+        // 답변에 언급된 위스키 매칭 — 카탈로그의 name/name_kr substring 검색
+        const { data: bottlings } = await supabase
+          .from("bottlings")
+          .select("id, name, name_kr")
+          .limit(2000);
+        const answerLower = fullText.toLowerCase();
+        type Row = { id: string; name: string | null; name_kr: string | null };
+        const rows = (bottlings ?? []) as Row[];
+        const matchesMap = new Map<string, { id: string; name: string; name_kr: string | null; matched: string }>();
+        for (const b of rows) {
+          const candidates: Array<{ text: string; source: "kr" | "en" }> = [];
+          if (b.name_kr && b.name_kr.length >= 3) candidates.push({ text: b.name_kr, source: "kr" });
+          if (b.name && b.name.length >= 3) candidates.push({ text: b.name, source: "en" });
+          for (const c of candidates) {
+            if (answerLower.includes(c.text.toLowerCase())) {
+              if (!matchesMap.has(b.id)) {
+                matchesMap.set(b.id, {
+                  id: b.id,
+                  name: b.name ?? c.text,
+                  name_kr: b.name_kr,
+                  matched: c.text,
+                });
+              }
+              break;
+            }
+          }
+        }
+        // 이름 길이 긴 것 우선 (더 구체적인 이름이 정확할 확률 높음)
+        const matches = Array.from(matchesMap.values())
+          .sort((a, b) => b.matched.length - a.matched.length)
+          .slice(0, 5)
+          .map(({ id, name, name_kr }) => ({ id, name, name_kr }));
+
+        send("matches", { matches });
+        send("done", {});
+      } catch (e) {
+        send("error", { error: e instanceof Error ? e.message : "Claude call failed" });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "private, no-cache, no-store, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
