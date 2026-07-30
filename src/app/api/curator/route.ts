@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { loadTasteProfile } from "@/lib/tastings/taste-profile";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 // ────────────────────────────────────────────────
