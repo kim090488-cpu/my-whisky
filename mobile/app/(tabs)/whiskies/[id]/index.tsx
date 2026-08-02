@@ -32,6 +32,7 @@ type Bottling = {
   bottle_size_ml: number | null;
   total_bottles: number | null;
   notes: string | null;
+  barcode: string | null;
   distillery: {
     id: string;
     name: string;
@@ -71,7 +72,7 @@ export default function BottlingDetail() {
         .from("bottlings")
         .select(
           `id, name, age_years, abv, vintage_year, bottling_year,
-           cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes,
+           cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes, barcode,
            distillery:distilleries(id, name, country, region)`,
         )
         .eq("id", id)
@@ -210,6 +211,7 @@ export default function BottlingDetail() {
         {b.bottling_year != null && <Stat label="병입연도" value={String(b.bottling_year)} />}
         {b.bottle_size_ml != null && <Stat label="용량" value={`${b.bottle_size_ml}ml`} />}
         {b.total_bottles != null && <Stat label="총 병수" value={`${b.total_bottles}병`} />}
+        {b.barcode && <Stat label="바코드 📷" value={b.barcode} />}
       </View>
 
       {b.notes && <Text style={styles.bottlingNotes}>{b.notes}</Text>}

@@ -58,12 +58,16 @@ export default function ScanScreen() {
     }
 
     Alert.alert(
-      "미등록 위스키",
-      `바코드: ${data}\n등록되지 않은 위스키예요. 지금 등록해서 태그할 수 있어요.`,
+      "미등록 바코드",
+      `바코드: ${data}\n\n이미 카탈로그에 있는 위스키라면 "기존 위스키에 연결"을,\n처음 등록하는 위스키라면 "새 위스키로 등록"을 선택하세요.`,
       [
         { text: "다시 스캔", onPress: () => { lastCodeRef.current = null; setScanning(true); } },
         {
-          text: "등록하기",
+          text: "기존 위스키에 연결",
+          onPress: () => router.replace(`/(tabs)/whiskies/link-barcode?barcode=${encodeURIComponent(data)}` as never),
+        },
+        {
+          text: "새 위스키로 등록",
           onPress: () => router.replace(`/(tabs)/whiskies/new?barcode=${encodeURIComponent(data)}` as never),
         },
       ],

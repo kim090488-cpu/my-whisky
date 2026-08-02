@@ -29,6 +29,7 @@ type Bottling = {
   bottle_size_ml: number | null;
   total_bottles: number | null;
   notes: string | null;
+  barcode: string | null;
 };
 
 export default function EditBottling() {
@@ -53,13 +54,14 @@ export default function EditBottling() {
   const [bottleSizeMl, setBottleSizeMl] = useState("");
   const [totalBottles, setTotalBottles] = useState("");
   const [notes, setNotes] = useState("");
+  const [barcode, setBarcode] = useState("");
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       const { data } = await supabase
         .from("bottlings")
-        .select("id, distillery_id, name, name_kr, age_years, abv, vintage_year, bottling_year, cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes")
+        .select("id, distillery_id, name, name_kr, age_years, abv, vintage_year, bottling_year, cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes, barcode")
         .eq("id", id)
         .maybeSingle();
       const b = data as unknown as Bottling | null;
@@ -81,6 +83,7 @@ export default function EditBottling() {
       setBottleSizeMl(b.bottle_size_ml?.toString() ?? "");
       setTotalBottles(b.total_bottles?.toString() ?? "");
       setNotes(b.notes ?? "");
+      setBarcode(b.barcode ?? "");
       setLoading(false);
     })();
   }, [id, router]);
@@ -129,6 +132,9 @@ export default function EditBottling() {
 
     if (notes.trim().length > 2000) { setError("노트는 2000자 이내."); return; }
 
+    const barcodeTrim = barcode.trim();
+    if (barcodeTrim.length > 64) { setError("바코드는 64자 이내."); return; }
+
     setSaving(true);
     const { error: updateError } = await supabase
       .from("bottlings")
@@ -145,10 +151,17 @@ export default function EditBottling() {
         bottle_size_ml: size ?? 700,
         total_bottles: total,
         notes: notes.trim() || null,
+        barcode: barcodeTrim || null,
       } as never)
       .eq("id", current.id);
     setSaving(false);
-    if (updateError) { setError(updateError.message); return; }
+    if (updateError) {
+      const msg = /duplicate|unique/i.test(updateError.message)
+        ? "이 바코드는 이미 다른 위스키에 등록되어 있어요."
+        : updateError.message;
+      setError(msg);
+      return;
+    }
     router.replace(`/(tabs)/whiskies/${current.id}` as never);
   }
 
@@ -344,6 +357,29 @@ export default function EditBottling() {
           </View>
         </View>
 
+        <Field label="바코드">
+          <View style={styles.barcodeRow}>
+            <TextInput
+              value={barcode}
+              onChangeText={setBarcode}
+              maxLength={64}
+              placeholder="예: 5010314009328"
+              placeholderTextColor="#525252"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[styles.input, { flex: 1 }]}
+            />
+            {barcode.length > 0 && (
+              <Pressable
+                onPress={() => setBarcode("")}
+                style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.clearBtnText}>지우기</Text>
+              </Pressable>
+            )}
+          </View>
+        </Field>
+
         <Field label={`노트 (${notes.length}/2000)`}>
           <TextInput
             value={notes}
@@ -422,4 +458,12 @@ const styles = StyleSheet.create({
   },
   submitText: { color: "#0a0a0a", fontWeight: "700", fontSize: 15 },
   cancelText: { color: "#737373", textAlign: "center", padding: 12 },
+  barcodeRow: { flexDirection: "row", gap: 8, alignItems: "stretch" },
+  clearBtn: {
+    backgroundColor: "#171717",
+    borderWidth: 1, borderColor: "#262626",
+    paddingHorizontal: 12, borderRadius: 8,
+    alignItems: "center", justifyContent: "center",
+  },
+  clearBtnText: { color: "#a3a3a3", fontSize: 12 },
 });

@@ -28,6 +28,7 @@ export default function WhiskiesStackLayout() {
         options={{ title: "바코드 스캔", presentation: "modal" }}
       />
       <Stack.Screen name="new" options={{ title: "새 위스키 등록", presentation: "modal" }} />
+      <Stack.Screen name="link-barcode" options={{ title: "바코드 연결", presentation: "modal" }} />
       <Stack.Screen name="compare" options={{ title: "위스키 비교" }} />
     </Stack>
   );
