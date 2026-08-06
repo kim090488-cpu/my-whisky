@@ -86,7 +86,6 @@ export default function LinkBarcode() {
     if (!barcode || linkingId || !session) return;
 
     setLinkingId(bottlingId);
-    console.log("[link-barcode] insert", { bottlingId, barcode, source });
     const { error: insertError } = await supabase
       .from("bottling_barcodes")
       .insert({
@@ -95,7 +94,6 @@ export default function LinkBarcode() {
         source,
         created_by: session.user.id,
       } as never);
-    console.log("[link-barcode] insert result:", insertError?.message ?? "ok");
     setLinkingId(null);
 
     if (insertError) {

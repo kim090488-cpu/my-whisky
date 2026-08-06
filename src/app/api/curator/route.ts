@@ -320,14 +320,7 @@ export async function POST(request: Request) {
           throw new Error(`Anthropic ${anthropicRes.status}: ${errText.slice(0, 200)}`);
         }
 
-        type Usage = {
-          input_tokens: number;
-          output_tokens: number;
-          cache_creation_input_tokens?: number;
-          cache_read_input_tokens?: number;
-        };
         let fullText = "";
-        let usage: Usage | null = null;
 
         const reader = anthropicRes.body.getReader();
         const decoder = new TextDecoder();
@@ -347,30 +340,13 @@ export async function POST(request: Request) {
             if (!dataStr) continue;
             let payload: unknown;
             try { payload = JSON.parse(dataStr); } catch { continue; }
-            const p = payload as { type?: string; delta?: { type?: string; text?: string }; message?: { usage?: Usage }; usage?: Partial<Usage> };
+            const p = payload as { type?: string; delta?: { type?: string; text?: string } };
             if (p.type === "content_block_delta" && p.delta?.type === "text_delta" && p.delta.text) {
               fullText += p.delta.text;
               send("delta", { text: p.delta.text });
-            } else if (p.type === "message_start" && p.message?.usage) {
-              usage = p.message.usage;
-            } else if (p.type === "message_delta" && p.usage) {
-              // message_delta의 usage는 output_tokens 최종값 포함
-              const patch = p.usage;
-              usage = { ...(usage ?? { input_tokens: 0, output_tokens: 0 }), ...patch };
             }
           }
         }
-
-        console.log("[curator]", JSON.stringify({
-          user: user.id,
-          input: usage?.input_tokens ?? 0,
-          output: usage?.output_tokens ?? 0,
-          cache_write: usage?.cache_creation_input_tokens ?? 0,
-          cache_read: usage?.cache_read_input_tokens ?? 0,
-          personalized: !!userContextText,
-          streamed: true,
-          runtime: "edge",
-        }));
 
         // 답변에 언급된 위스키 매칭 — 카탈로그의 name/name_kr substring 검색
         const { data: bottlings } = await supabase

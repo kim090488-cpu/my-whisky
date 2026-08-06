@@ -65,7 +65,6 @@ export default function NewBottling() {
     if (abvN !== null && (abvN < 20 || abvN > 80)) { setError("ABV 20~80%"); return; }
 
     setSaving(true);
-    console.log("[new-bottling] submit with barcode:", barcode ?? "(none)");
     const { data, error: insertError } = await supabase
       .from("bottlings")
       .insert({
@@ -80,7 +79,6 @@ export default function NewBottling() {
       } as never)
       .select("id")
       .single();
-    console.log("[new-bottling] insert result:", insertError?.message ?? JSON.stringify(data));
     if (insertError) {
       setSaving(false);
       Alert.alert("등록 실패", insertError.message);
@@ -96,7 +94,6 @@ export default function NewBottling() {
           source,
           created_by: session.user.id,
         } as never);
-      console.log("[new-bottling] barcode insert:", barcodeError?.message ?? "ok");
       if (barcodeError && !/duplicate|unique/i.test(barcodeError.message)) {
         // 위스키 등록은 됐으니 진행하되 유저에게 알림
         Alert.alert("바코드 등록 실패", `위스키는 등록됐지만 바코드 저장에 실패했어요: ${barcodeError.message}`);

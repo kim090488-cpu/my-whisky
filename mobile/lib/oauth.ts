@@ -15,7 +15,6 @@ type Result =
 //   chrome이 exp:// 스킴을 처리 못해 Site URL로 fallback → 웹으로 이동. 하드코딩으로 우회.
 export async function signInWithProvider(provider: OAuthProvider): Promise<Result> {
   const redirectTo = "mywhisky://auth/callback";
-  console.log("[oauth] provider:", provider, "redirectTo:", redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
@@ -26,7 +25,6 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<Resul
   });
   if (error) return { ok: false, error: error.message };
   if (!data?.url) return { ok: false, error: "OAuth URL을 받지 못했어요." };
-  console.log("[oauth] auth url:", data.url);
 
   // 시스템 브라우저로 열기. 카카오는 kakaotalk 앱으로 스위치할 수 있어서
   // openAuthSessionAsync(in-app browser)로는 세션이 dismiss됨

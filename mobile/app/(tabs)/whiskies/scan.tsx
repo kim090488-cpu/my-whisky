@@ -41,15 +41,13 @@ export default function ScanScreen() {
     lastCodeRef.current = data;
     setScanning(false);
     setLookup(true);
-    console.log("[scan] barcode scanned:", data, "length:", data.length);
 
-    const { data: match, error: lookupError } = await supabase
+    const { data: match } = await supabase
       .from("bottling_barcodes")
       .select("bottling_id")
       .eq("barcode", data)
       .maybeSingle();
     const matched = match as unknown as { bottling_id: string } | null;
-    console.log("[scan] lookup result:", matched ? `found bottling_id=${matched.bottling_id}` : "not found", "error:", lookupError?.message ?? "none");
 
     setLookup(false);
 

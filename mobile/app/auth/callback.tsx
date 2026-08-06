@@ -10,25 +10,20 @@ export default function AuthCallback() {
 
   useEffect(() => {
     (async () => {
-      console.log("[callback] params:", JSON.stringify(params));
       if (params.error_description) {
         setError(String(params.error_description));
         return;
       }
       const code = typeof params.code === "string" ? params.code : null;
       if (!code) {
-        console.log("[callback] no code, redirecting to /me");
         router.replace("/(tabs)/me");
         return;
       }
-      console.log("[callback] exchanging code:", code);
       const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
       if (exchangeErr) {
-        console.log("[callback] exchange error:", exchangeErr.message);
         setError(exchangeErr.message);
         return;
       }
-      console.log("[callback] exchange success, redirecting to /me");
       router.replace("/(tabs)/me");
     })();
   }, [params.code, params.error_description, router]);
