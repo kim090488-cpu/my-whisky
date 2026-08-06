@@ -8,6 +8,7 @@ npm-debug.*
 *.key
 *.mobileprovision
 *.orig.*
+credentials.json
 web-build/
 .env*
 !.env.example
