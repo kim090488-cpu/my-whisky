@@ -13,6 +13,14 @@ import type { CaskType, BottlerKind } from "@/types/database";
 const CASKS: CaskType[] = ["bourbon", "sherry", "port", "wine", "rum", "virgin_oak", "refill", "mixed", "other", "unknown"];
 const BOTTLERS: BottlerKind[] = ["official", "independent", "private"];
 
+type BarcodeSource = "manufacturer" | "importer" | "retailer" | "unknown";
+const SOURCE_OPTIONS: { key: BarcodeSource; label: string }[] = [
+  { key: "manufacturer", label: "제조사 원본" },
+  { key: "importer", label: "한글 수입 스티커" },
+  { key: "retailer", label: "유통사 부착" },
+  { key: "unknown", label: "모름" },
+];
+
 export default function NewBottling() {
   const { barcode } = useLocalSearchParams<{ barcode?: string }>();
   const router = useRouter();
@@ -24,6 +32,7 @@ export default function NewBottling() {
   const [abv, setAbv] = useState("");
   const [caskType, setCaskType] = useState<CaskType>("unknown");
   const [bottler, setBottler] = useState<BottlerKind>("official");
+  const [source, setSource] = useState<BarcodeSource>("unknown");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,18 +76,33 @@ export default function NewBottling() {
         cask_type: caskType,
         bottler,
         bottle_size_ml: 700,
-        barcode: barcode ?? null,
         created_by: session.user.id,
       } as never)
-      .select("id, barcode")
+      .select("id")
       .single();
     console.log("[new-bottling] insert result:", insertError?.message ?? JSON.stringify(data));
-    setSaving(false);
     if (insertError) {
+      setSaving(false);
       Alert.alert("등록 실패", insertError.message);
       return;
     }
     const newId = (data as unknown as { id: string } | null)?.id;
+    if (newId && barcode) {
+      const { error: barcodeError } = await supabase
+        .from("bottling_barcodes")
+        .insert({
+          bottling_id: newId,
+          barcode,
+          source,
+          created_by: session.user.id,
+        } as never);
+      console.log("[new-bottling] barcode insert:", barcodeError?.message ?? "ok");
+      if (barcodeError && !/duplicate|unique/i.test(barcodeError.message)) {
+        // 위스키 등록은 됐으니 진행하되 유저에게 알림
+        Alert.alert("바코드 등록 실패", `위스키는 등록됐지만 바코드 저장에 실패했어요: ${barcodeError.message}`);
+      }
+    }
+    setSaving(false);
     if (newId) router.replace(`/(tabs)/whiskies/${newId}` as never);
     else router.back();
   }
@@ -92,9 +116,23 @@ export default function NewBottling() {
       <Stack.Screen options={{ title: "새 위스키 등록" }} />
       <KeyboardAwareScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" enableOnAndroid extraScrollHeight={80}>
         {barcode && (
-          <View style={styles.barcodeCard}>
-            <Text style={styles.barcodeLabel}>스캔된 바코드</Text>
-            <Text style={styles.barcodeValue}>{barcode}</Text>
+          <View style={{ gap: 8 }}>
+            <View style={styles.barcodeCard}>
+              <Text style={styles.barcodeLabel}>스캔된 바코드</Text>
+              <Text style={styles.barcodeValue}>{barcode}</Text>
+            </View>
+            <Text style={styles.label}>바코드 종류</Text>
+            <View style={styles.pillWrap}>
+              {SOURCE_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setSource(opt.key)}
+                  style={({ pressed }) => [styles.pill, source === opt.key && styles.pillActive, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.pillText, source === opt.key && styles.pillTextActive]}>{opt.label}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         )}
         <Text style={styles.lead}>최소 정보만 입력해도 됩니다. 상세는 나중에 편집 가능.</Text>

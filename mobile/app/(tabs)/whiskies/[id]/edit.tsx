@@ -14,6 +14,22 @@ const CASKS: CaskType[] = ["bourbon", "sherry", "port", "wine", "rum", "virgin_o
 const BOTTLERS: BottlerKind[] = ["official", "independent", "private"];
 const THIS_YEAR = new Date().getFullYear();
 
+type BarcodeSource = "manufacturer" | "importer" | "retailer" | "unknown";
+const SOURCE_OPTIONS: { key: BarcodeSource; label: string }[] = [
+  { key: "manufacturer", label: "제조사 원본" },
+  { key: "importer", label: "한글 수입 스티커" },
+  { key: "retailer", label: "유통사 부착" },
+  { key: "unknown", label: "모름" },
+];
+const SOURCE_SHORT: Record<BarcodeSource, string> = {
+  manufacturer: "제조사",
+  importer: "수입 스티커",
+  retailer: "유통사",
+  unknown: "종류 미지정",
+};
+
+type Barcode = { id: string; barcode: string; source: BarcodeSource };
+
 type Bottling = {
   id: string;
   distillery_id: string | null;
@@ -29,7 +45,6 @@ type Bottling = {
   bottle_size_ml: number | null;
   total_bottles: number | null;
   notes: string | null;
-  barcode: string | null;
 };
 
 export default function EditBottling() {
@@ -54,16 +69,26 @@ export default function EditBottling() {
   const [bottleSizeMl, setBottleSizeMl] = useState("");
   const [totalBottles, setTotalBottles] = useState("");
   const [notes, setNotes] = useState("");
-  const [barcode, setBarcode] = useState("");
+  const [barcodes, setBarcodes] = useState<Barcode[]>([]);
+  const [newBarcode, setNewBarcode] = useState("");
+  const [newSource, setNewSource] = useState<BarcodeSource>("unknown");
+  const [barcodeBusy, setBarcodeBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data } = await supabase
-        .from("bottlings")
-        .select("id, distillery_id, name, name_kr, age_years, abv, vintage_year, bottling_year, cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes, barcode")
-        .eq("id", id)
-        .maybeSingle();
+      const [{ data }, { data: barcodeRows }] = await Promise.all([
+        supabase
+          .from("bottlings")
+          .select("id, distillery_id, name, name_kr, age_years, abv, vintage_year, bottling_year, cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes")
+          .eq("id", id)
+          .maybeSingle(),
+        supabase
+          .from("bottling_barcodes")
+          .select("id, barcode, source")
+          .eq("bottling_id", id)
+          .order("created_at", { ascending: true }),
+      ]);
       const b = data as unknown as Bottling | null;
       if (!b) {
         Alert.alert("찾을 수 없어요", "위스키 정보를 불러오지 못했어요.");
@@ -83,10 +108,70 @@ export default function EditBottling() {
       setBottleSizeMl(b.bottle_size_ml?.toString() ?? "");
       setTotalBottles(b.total_bottles?.toString() ?? "");
       setNotes(b.notes ?? "");
-      setBarcode(b.barcode ?? "");
+      setBarcodes((barcodeRows as unknown as Barcode[]) ?? []);
       setLoading(false);
     })();
   }, [id, router]);
+
+  async function addBarcode() {
+    const value = newBarcode.trim();
+    if (!value || !current || !session || barcodeBusy) return;
+    if (value.length > 64) { Alert.alert("바코드 길이", "바코드는 64자 이내로 입력해주세요."); return; }
+    if (barcodes.some((b) => b.barcode === value)) {
+      Alert.alert("이미 등록됨", "이 바코드는 이미 등록돼 있어요.");
+      return;
+    }
+    setBarcodeBusy(true);
+    const { data, error: insertError } = await supabase
+      .from("bottling_barcodes")
+      .insert({
+        bottling_id: current.id,
+        barcode: value,
+        source: newSource,
+        created_by: session.user.id,
+      } as never)
+      .select("id, barcode, source")
+      .single();
+    setBarcodeBusy(false);
+    if (insertError) {
+      const msg = /duplicate|unique/i.test(insertError.message)
+        ? "이 바코드는 이미 다른 위스키에 등록되어 있어요."
+        : insertError.message;
+      Alert.alert("바코드 추가 실패", msg);
+      return;
+    }
+    const inserted = data as unknown as Barcode;
+    setBarcodes((prev) => [...prev, inserted]);
+    setNewBarcode("");
+    setNewSource("unknown");
+  }
+
+  async function removeBarcode(barcodeId: string) {
+    if (barcodeBusy) return;
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        "바코드 삭제",
+        "이 바코드를 삭제할까요? 다시 스캔해도 이 위스키와 연결되지 않아요.",
+        [
+          { text: "취소", style: "cancel", onPress: () => resolve(false) },
+          { text: "삭제", style: "destructive", onPress: () => resolve(true) },
+        ],
+        { onDismiss: () => resolve(false) },
+      );
+    });
+    if (!confirmed) return;
+    setBarcodeBusy(true);
+    const { error: deleteError } = await supabase
+      .from("bottling_barcodes")
+      .delete()
+      .eq("id", barcodeId);
+    setBarcodeBusy(false);
+    if (deleteError) {
+      Alert.alert("삭제 실패", deleteError.message);
+      return;
+    }
+    setBarcodes((prev) => prev.filter((b) => b.id !== barcodeId));
+  }
 
   function intOrNull(v: string): number | null {
     const s = v.trim();
@@ -132,9 +217,6 @@ export default function EditBottling() {
 
     if (notes.trim().length > 2000) { setError("노트는 2000자 이내."); return; }
 
-    const barcodeTrim = barcode.trim();
-    if (barcodeTrim.length > 64) { setError("바코드는 64자 이내."); return; }
-
     setSaving(true);
     const { error: updateError } = await supabase
       .from("bottlings")
@@ -151,17 +233,10 @@ export default function EditBottling() {
         bottle_size_ml: size ?? 700,
         total_bottles: total,
         notes: notes.trim() || null,
-        barcode: barcodeTrim || null,
       } as never)
       .eq("id", current.id);
     setSaving(false);
-    if (updateError) {
-      const msg = /duplicate|unique/i.test(updateError.message)
-        ? "이 바코드는 이미 다른 위스키에 등록되어 있어요."
-        : updateError.message;
-      setError(msg);
-      return;
-    }
+    if (updateError) { setError(updateError.message); return; }
     router.replace(`/(tabs)/whiskies/${current.id}` as never);
   }
 
@@ -358,25 +433,63 @@ export default function EditBottling() {
         </View>
 
         <Field label="바코드">
-          <View style={styles.barcodeRow}>
-            <TextInput
-              value={barcode}
-              onChangeText={setBarcode}
-              maxLength={64}
-              placeholder="예: 5010314009328"
-              placeholderTextColor="#525252"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={[styles.input, { flex: 1 }]}
-            />
-            {barcode.length > 0 && (
+          <Text style={styles.hint}>한 위스키에 여러 바코드(제조사·수입 스티커·유통사) 등록 가능</Text>
+
+          {barcodes.length > 0 && (
+            <View style={{ gap: 6 }}>
+              {barcodes.map((bc) => (
+                <View key={bc.id} style={styles.barcodeItemRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.barcodeItemSource}>{SOURCE_SHORT[bc.source]}</Text>
+                    <Text style={styles.barcodeItemCode}>{bc.barcode}</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => removeBarcode(bc.id)}
+                    disabled={barcodeBusy}
+                    style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.7 }, barcodeBusy && { opacity: 0.5 }]}
+                  >
+                    <Text style={styles.removeBtnText}>삭제</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={{ gap: 6, marginTop: 8 }}>
+            <View style={styles.pillWrap}>
+              {SOURCE_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setNewSource(opt.key)}
+                  style={({ pressed }) => [styles.pill, newSource === opt.key && styles.pillActive, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={[styles.pillText, newSource === opt.key && styles.pillTextActive]}>{opt.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.barcodeRow}>
+              <TextInput
+                value={newBarcode}
+                onChangeText={setNewBarcode}
+                maxLength={64}
+                placeholder="바코드 직접 입력 (스캔은 위스키 목록 화면에서)"
+                placeholderTextColor="#525252"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.input, { flex: 1 }]}
+              />
               <Pressable
-                onPress={() => setBarcode("")}
-                style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
+                onPress={addBarcode}
+                disabled={!newBarcode.trim() || barcodeBusy}
+                style={({ pressed }) => [
+                  styles.addBtn,
+                  (!newBarcode.trim() || barcodeBusy) && { opacity: 0.5 },
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                <Text style={styles.clearBtnText}>지우기</Text>
+                <Text style={styles.addBtnText}>추가</Text>
               </Pressable>
-            )}
+            </View>
           </View>
         </Field>
 
@@ -459,11 +572,27 @@ const styles = StyleSheet.create({
   submitText: { color: "#0a0a0a", fontWeight: "700", fontSize: 15 },
   cancelText: { color: "#737373", textAlign: "center", padding: 12 },
   barcodeRow: { flexDirection: "row", gap: 8, alignItems: "stretch" },
-  clearBtn: {
+  hint: { color: "#737373", fontSize: 11, lineHeight: 16 },
+  barcodeItemRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: "#171717",
     borderWidth: 1, borderColor: "#262626",
-    paddingHorizontal: 12, borderRadius: 8,
+    borderRadius: 8, padding: 10,
+  },
+  barcodeItemSource: {
+    color: "#a3a3a3", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5,
+  },
+  barcodeItemCode: { color: "#fbbf24", fontSize: 13, fontWeight: "600", letterSpacing: 0.5, marginTop: 2 },
+  removeBtn: {
+    backgroundColor: "#171717",
+    borderWidth: 1, borderColor: "rgba(244, 63, 94, 0.4)",
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6,
+  },
+  removeBtnText: { color: "#fca5a5", fontSize: 12, fontWeight: "600" },
+  addBtn: {
+    backgroundColor: "#fbbf24",
+    paddingHorizontal: 16, borderRadius: 8,
     alignItems: "center", justifyContent: "center",
   },
-  clearBtnText: { color: "#a3a3a3", fontSize: 12 },
+  addBtnText: { color: "#0a0a0a", fontWeight: "700", fontSize: 13 },
 });

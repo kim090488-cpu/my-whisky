@@ -43,25 +43,27 @@ export default function ScanScreen() {
     setLookup(true);
     console.log("[scan] barcode scanned:", data, "length:", data.length);
 
-    const { data: bottling, error: lookupError } = await supabase
-      .from("bottlings")
-      .select("id, name, barcode")
+    const { data: match, error: lookupError } = await supabase
+      .from("bottling_barcodes")
+      .select("bottling_id")
       .eq("barcode", data)
       .maybeSingle();
-    console.log("[scan] lookup result:", bottling ? `found id=${bottling.id} barcode=${bottling.barcode}` : "not found", "error:", lookupError?.message ?? "none");
+    const matched = match as unknown as { bottling_id: string } | null;
+    console.log("[scan] lookup result:", matched ? `found bottling_id=${matched.bottling_id}` : "not found", "error:", lookupError?.message ?? "none");
 
     setLookup(false);
 
-    if (bottling) {
-      router.replace(`/whiskies/${bottling.id}`);
+    if (matched) {
+      router.replace(`/whiskies/${matched.bottling_id}` as never);
       return;
     }
 
+    const resumeScanning = () => { lastCodeRef.current = null; setScanning(true); };
     Alert.alert(
       "미등록 바코드",
       `바코드: ${data}\n\n이미 카탈로그에 있는 위스키라면 "기존 위스키에 연결"을,\n처음 등록하는 위스키라면 "새 위스키로 등록"을 선택하세요.`,
       [
-        { text: "다시 스캔", onPress: () => { lastCodeRef.current = null; setScanning(true); } },
+        { text: "다시 스캔", onPress: resumeScanning },
         {
           text: "기존 위스키에 연결",
           onPress: () => router.replace(`/(tabs)/whiskies/link-barcode?barcode=${encodeURIComponent(data)}` as never),
@@ -71,6 +73,7 @@ export default function ScanScreen() {
           onPress: () => router.replace(`/(tabs)/whiskies/new?barcode=${encodeURIComponent(data)}` as never),
         },
       ],
+      { onDismiss: resumeScanning },
     );
   }
 

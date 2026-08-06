@@ -215,7 +215,6 @@ export interface Database {
           bottler_name: string | null;
           bottle_size_ml: number | null;
           total_bottles: number | null;
-          barcode: string | null;
           label_image_url: string | null;
           notes: string | null;
           created_by: string | null;
@@ -235,7 +234,6 @@ export interface Database {
           bottler_name?: string | null;
           bottle_size_ml?: number | null;
           total_bottles?: number | null;
-          barcode?: string | null;
           label_image_url?: string | null;
           notes?: string | null;
           created_by?: string | null;
@@ -247,6 +245,32 @@ export interface Database {
             columns: ["distillery_id"];
             isOneToOne: false;
             referencedRelation: "distilleries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      bottling_barcodes: {
+        Row: {
+          id: string;
+          bottling_id: string;
+          barcode: string;
+          source: "manufacturer" | "importer" | "retailer" | "unknown";
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          bottling_id: string;
+          barcode: string;
+          source?: "manufacturer" | "importer" | "retailer" | "unknown";
+          created_by?: string | null;
+        };
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: "bottling_barcodes_bottling_id_fkey";
+            columns: ["bottling_id"];
+            isOneToOne: false;
+            referencedRelation: "bottlings";
             referencedColumns: ["id"];
           },
         ];

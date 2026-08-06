@@ -26,6 +26,14 @@ type Bottling = {
 const SELECT =
   "id, name, name_kr, age_years, abv, distillery_name, distillery_name_kr, country, region, avg_score, tasting_count";
 
+type BarcodeSource = "manufacturer" | "importer" | "retailer" | "unknown";
+const SOURCE_OPTIONS: { key: BarcodeSource; label: string }[] = [
+  { key: "manufacturer", label: "제조사 원본" },
+  { key: "importer", label: "한글 수입 스티커" },
+  { key: "retailer", label: "유통사 부착" },
+  { key: "unknown", label: "모름" },
+];
+
 export default function LinkBarcode() {
   const { barcode } = useLocalSearchParams<{ barcode?: string }>();
   const router = useRouter();
@@ -35,6 +43,7 @@ export default function LinkBarcode() {
   const [items, setItems] = useState<Bottling[]>([]);
   const [loading, setLoading] = useState(false);
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [source, setSource] = useState<BarcodeSource>("unknown");
 
   const search = useCallback(async (term: string) => {
     const t = term.trim();
@@ -74,48 +83,39 @@ export default function LinkBarcode() {
   }, [q, search]);
 
   async function link(bottlingId: string) {
-    if (!barcode || linkingId) return;
-    // 이미 barcode 있는지 조회 후 확인
-    const { data: current, error: readError } = await supabase
-      .from("bottlings")
-      .select("id, name_kr, name, barcode")
-      .eq("id", bottlingId)
-      .maybeSingle();
-    if (readError || !current) {
-      Alert.alert("연결 실패", readError?.message ?? "위스키를 찾을 수 없어요.");
-      return;
-    }
-    const row = current as unknown as { id: string; name_kr: string | null; name: string; barcode: string | null };
-    if (row.barcode && row.barcode !== barcode) {
-      const displayName = row.name_kr ?? row.name;
-      const proceed = await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          "이미 다른 바코드가 등록돼 있어요",
-          `${displayName}에는 이미 바코드가 있어요.\n기존: ${row.barcode}\n새로: ${barcode}\n덮어쓸까요?`,
-          [
-            { text: "취소", style: "cancel", onPress: () => resolve(false) },
-            { text: "덮어쓰기", style: "destructive", onPress: () => resolve(true) },
-          ],
-        );
-      });
-      if (!proceed) return;
-    }
+    if (!barcode || linkingId || !session) return;
 
     setLinkingId(bottlingId);
-    console.log("[link-barcode] updating", bottlingId, "with", barcode);
-    const { error: updateError } = await supabase
-      .from("bottlings")
-      .update({ barcode } as never)
-      .eq("id", bottlingId);
-    console.log("[link-barcode] update result:", updateError?.message ?? "ok");
+    console.log("[link-barcode] insert", { bottlingId, barcode, source });
+    const { error: insertError } = await supabase
+      .from("bottling_barcodes")
+      .insert({
+        bottling_id: bottlingId,
+        barcode,
+        source,
+        created_by: session.user.id,
+      } as never);
+    console.log("[link-barcode] insert result:", insertError?.message ?? "ok");
     setLinkingId(null);
 
-    if (updateError) {
-      // unique 위반이면 이미 다른 위스키에 이 barcode가 붙어있음
-      const msg = /duplicate|unique/i.test(updateError.message)
-        ? "이 바코드는 이미 다른 위스키에 등록되어 있어요."
-        : updateError.message;
-      Alert.alert("연결 실패", msg);
+    if (insertError) {
+      if (/duplicate|unique/i.test(insertError.message)) {
+        // 이미 등록된 바코드 — 같은 위스키인지 다른 위스키인지 확인
+        const { data: existing } = await supabase
+          .from("bottling_barcodes")
+          .select("bottling_id")
+          .eq("barcode", barcode)
+          .maybeSingle();
+        const row = existing as unknown as { bottling_id: string } | null;
+        if (row && row.bottling_id === bottlingId) {
+          // 같은 위스키에 이미 있음 — 그냥 detail로
+          router.replace(`/whiskies/${bottlingId}` as never);
+          return;
+        }
+        Alert.alert("연결 실패", "이 바코드는 이미 다른 위스키에 등록되어 있어요.");
+        return;
+      }
+      Alert.alert("연결 실패", insertError.message);
       return;
     }
     router.replace(`/whiskies/${bottlingId}` as never);
@@ -137,6 +137,26 @@ export default function LinkBarcode() {
         <Text style={styles.barcodeLabel}>연결할 바코드</Text>
         <Text style={styles.barcodeValue}>{barcode ?? "(없음)"}</Text>
       </View>
+
+      <Text style={styles.sourceLabel}>바코드 종류</Text>
+      <View style={styles.sourceRow}>
+        {SOURCE_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt.key}
+            onPress={() => setSource(opt.key)}
+            style={({ pressed }) => [
+              styles.sourceChip,
+              source === opt.key && styles.sourceChipActive,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={[styles.sourceChipText, source === opt.key && styles.sourceChipTextActive]}>
+              {opt.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <Text style={styles.lead}>기존 카탈로그에서 이 병에 해당하는 위스키를 찾아 선택하면 바코드가 연결돼요.</Text>
 
       <TextInput
@@ -220,6 +240,22 @@ const styles = StyleSheet.create({
   },
   barcodeLabel: { color: "#a3a3a3", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   barcodeValue: { color: "#fbbf24", fontSize: 14, fontWeight: "600", letterSpacing: 1 },
+  sourceLabel: {
+    color: "#a3a3a3", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5,
+    paddingHorizontal: 12, paddingTop: 12, paddingBottom: 6,
+  },
+  sourceRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 12 },
+  sourceChip: {
+    backgroundColor: "#171717",
+    borderWidth: 1, borderColor: "#262626",
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+  },
+  sourceChipActive: {
+    backgroundColor: "rgba(251, 191, 36, 0.15)",
+    borderColor: "#fbbf24",
+  },
+  sourceChipText: { color: "#a3a3a3", fontSize: 12 },
+  sourceChipTextActive: { color: "#fbbf24", fontWeight: "600" },
   lead: { color: "#a3a3a3", fontSize: 12, lineHeight: 18, paddingHorizontal: 12, paddingTop: 8 },
   searchInput: {
     marginHorizontal: 12, marginTop: 10,

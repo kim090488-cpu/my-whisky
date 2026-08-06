@@ -19,6 +19,16 @@ import { BottlingFansSection } from "@/components/social/bottling-fans-section";
 import { TastingCard } from "@/components/social/tasting-card";
 import { CollectionPicker } from "@/components/whisky/collection-picker";
 
+type BarcodeSource = "manufacturer" | "importer" | "retailer" | "unknown";
+const SOURCE_LABEL: Record<BarcodeSource, string> = {
+  manufacturer: "제조사",
+  importer: "수입 스티커",
+  retailer: "유통사",
+  unknown: "종류 미지정",
+};
+
+type Barcode = { id: string; barcode: string; source: BarcodeSource };
+
 type Bottling = {
   id: string;
   name: string;
@@ -32,7 +42,6 @@ type Bottling = {
   bottle_size_ml: number | null;
   total_bottles: number | null;
   notes: string | null;
-  barcode: string | null;
   distillery: {
     id: string;
     name: string;
@@ -59,6 +68,7 @@ export default function BottlingDetail() {
   const router = useRouter();
   const { session } = useSession();
   const [b, setB] = useState<Bottling | null>(null);
+  const [barcodes, setBarcodes] = useState<Barcode[]>([]);
   const [tastings, setTastings] = useState<Tasting[]>([]);
   const [verdict, setVerdict] = useState<(FlavorProfileData & { total_reviews: number }) | null>(null);
   const [fans, setFans] = useState<BottlingFan[]>([]);
@@ -72,20 +82,26 @@ export default function BottlingDetail() {
         .from("bottlings")
         .select(
           `id, name, age_years, abv, vintage_year, bottling_year,
-           cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes, barcode,
+           cask_type, bottler, bottler_name, bottle_size_ml, total_bottles, notes,
            distillery:distilleries(id, name, country, region)`,
         )
         .eq("id", id)
         .maybeSingle();
 
       if (bottling) {
-        const d = Array.isArray(bottling.distillery)
-          ? bottling.distillery[0]
-          : bottling.distillery;
-        setB({ ...bottling, distillery: d ?? null } as Bottling);
+        const bt = bottling as unknown as Omit<Bottling, "distillery"> & { distillery: Bottling["distillery"] | Bottling["distillery"][] };
+        const d = Array.isArray(bt.distillery) ? bt.distillery[0] : bt.distillery;
+        setB({ ...bt, distillery: d ?? null } as Bottling);
       } else {
         setB(null);
       }
+
+      const { data: barcodeRows } = await supabase
+        .from("bottling_barcodes")
+        .select("id, barcode, source")
+        .eq("bottling_id", id)
+        .order("created_at", { ascending: true });
+      setBarcodes((barcodeRows as unknown as Barcode[]) ?? []);
 
       const { data: rawT } = await supabase
         .from("tastings")
@@ -211,8 +227,21 @@ export default function BottlingDetail() {
         {b.bottling_year != null && <Stat label="병입연도" value={String(b.bottling_year)} />}
         {b.bottle_size_ml != null && <Stat label="용량" value={`${b.bottle_size_ml}ml`} />}
         {b.total_bottles != null && <Stat label="총 병수" value={`${b.total_bottles}병`} />}
-        {b.barcode && <Stat label="바코드 📷" value={b.barcode} />}
       </View>
+
+      {barcodes.length > 0 && (
+        <View style={styles.barcodesSection}>
+          <Text style={styles.barcodesTitle}>바코드 📷</Text>
+          <View style={styles.barcodesList}>
+            {barcodes.map((bc) => (
+              <View key={bc.id} style={styles.barcodeChip}>
+                <Text style={styles.barcodeChipSource}>{SOURCE_LABEL[bc.source]}</Text>
+                <Text style={styles.barcodeChipCode}>{bc.barcode}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {b.notes && <Text style={styles.bottlingNotes}>{b.notes}</Text>}
 
@@ -302,6 +331,20 @@ const styles = StyleSheet.create({
   statValue: { color: "#fafafa", fontSize: 14, marginTop: 3 },
 
   bottlingNotes: { color: "#d4d4d4", fontSize: 13, padding: 16, lineHeight: 20 },
+
+  barcodesSection: { paddingHorizontal: 16, paddingTop: 14, gap: 8 },
+  barcodesTitle: { color: "#a3a3a3", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 },
+  barcodesList: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  barcodeChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(251, 191, 36, 0.08)",
+    borderWidth: 1, borderColor: "rgba(251, 191, 36, 0.35)",
+    borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  barcodeChipSource: {
+    color: "#a3a3a3", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5,
+  },
+  barcodeChipCode: { color: "#fbbf24", fontSize: 12, fontWeight: "600", letterSpacing: 0.5 },
 
   tastingsHeader: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
