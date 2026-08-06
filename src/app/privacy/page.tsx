@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "개인정보 처리방침 · my-whisky",
+  title: "개인정보 처리방침",
   description: "my-whisky 서비스의 개인정보 수집·이용·보관·파기 방침",
 };
 

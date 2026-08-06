@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "이용약관 · my-whisky",
+  title: "이용약관",
   description: "my-whisky 서비스 이용약관",
 };
 
