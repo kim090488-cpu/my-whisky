@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/api", "/auth", "/whiskies", "/distilleries", "/tastings", "/ranking", "/picks", "/posts", "/profile", "/community", "/privacy", "/terms"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/api", "/auth", "/whiskies", "/distilleries", "/tastings", "/ranking", "/picks", "/posts", "/profile", "/community", "/privacy", "/terms", "/account/delete"];
 
 const isDev = process.env.NODE_ENV !== "production";
 

@@ -86,7 +86,11 @@ export default function PrivacyPolicy() {
           <List
             items={[
               "언제든 서비스 내에서 프로필·테이스팅·컬렉션·게시글을 조회·수정·삭제할 수 있습니다.",
-              "&ldquo;내 정보&rdquo; 화면에서 계정 삭제를 요청할 수 있으며, 삭제 시 위 4항의 절차에 따라 처리됩니다.",
+              <>
+                &ldquo;내 정보&rdquo; 화면 하단의 &ldquo;계정 삭제&rdquo; 항목(웹은{" "}
+                <a href="/me/settings/delete-account" className="text-primary underline underline-offset-4">/me/settings/delete-account</a>,
+                별도 안내는 <a href="/account/delete" className="text-primary underline underline-offset-4">/account/delete</a>)에서 직접 삭제할 수 있으며, 삭제 시 위 4항의 절차에 따라 처리됩니다.
+              </>,
               <>개인정보 열람·정정·삭제·처리정지 요청은 아래 문의처로 접수됩니다. <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary underline underline-offset-4">{CONTACT_EMAIL}</a></>,
             ]}
           />

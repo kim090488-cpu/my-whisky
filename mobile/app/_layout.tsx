@@ -33,6 +33,7 @@ export default function RootLayout() {
           <Stack.Screen name="posts/new" options={{ title: "새 모먼트" }} />
           <Stack.Screen name="notification-settings" options={{ title: "알림 설정" }} />
           <Stack.Screen name="curator" options={{ title: "AI 큐레이터" }} />
+          <Stack.Screen name="settings/delete-account" options={{ title: "계정 삭제" }} />
         </Stack>
       </SessionProvider>
     </SafeAreaProvider>

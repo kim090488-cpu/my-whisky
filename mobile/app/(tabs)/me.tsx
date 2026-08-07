@@ -413,6 +413,14 @@ function LoggedIn() {
         <Ionicons name="log-out-outline" size={16} color="#f43f5e" />
         <Text style={styles.signOutText}>{signingOut ? "로그아웃 중…" : "로그아웃"}</Text>
       </Pressable>
+
+      <Pressable
+        onPress={() => router.push("/settings/delete-account" as never)}
+        style={({ pressed }) => [styles.deleteLink, pressed && { opacity: 0.6 }]}
+      >
+        <Ionicons name="trash-outline" size={13} color="#737373" />
+        <Text style={styles.deleteLinkText}>계정 삭제</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -616,4 +624,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(244,63,94,0.04)",
   },
   signOutText: { color: "#f43f5e", fontSize: 14, fontWeight: "600" },
+
+  // 계정 삭제 (subtle danger link)
+  deleteLink: {
+    marginTop: 16,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  deleteLinkText: { color: "#737373", fontSize: 12 },
 });

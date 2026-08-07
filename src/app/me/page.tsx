@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { COLLECTION_LABEL } from "@/lib/format";
 import { Avatar } from "@/components/avatar";
-import { NotebookPen, Library, Pencil, Rss, Bell, Sparkles } from "lucide-react";
+import { NotebookPen, Library, Pencil, Rss, Bell, Sparkles, Trash2 } from "lucide-react";
 import type { CollectionStatus } from "@/types/database";
 import { loadTasteProfile } from "@/lib/tastings/taste-profile";
 import { TasteProfileChips } from "@/components/social/taste-profile-chips";
@@ -129,6 +129,16 @@ export default async function MePage() {
         >
           <Sparkles className="size-4" />
           이번 달 회고
+        </Link>
+      </div>
+
+      <div className="mt-14 border-t border-border/60 pt-6">
+        <Link
+          href="/me/settings/delete-account"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 transition-colors hover:text-rose-300"
+        >
+          <Trash2 className="size-3.5" />
+          계정 삭제
         </Link>
       </div>
     </main>
