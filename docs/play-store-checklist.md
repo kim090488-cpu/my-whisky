@@ -6,7 +6,7 @@
 Play Store에 첫 AAB를 업로드하면 keystore가 **영구 잠김**. EAS가 관리하는 keystore를 잃으면 앱 업데이트가 불가능해집니다.
 
 ```powershell
-# 별도 PowerShell TTY에서:
+# 별도 PowerShell 창에서 (Windows PS 5.1은 && 안 됨, 두 줄로):
 cd D:\my-whisky\mobile
 eas credentials -p android
 # 프롬프트 진행:
