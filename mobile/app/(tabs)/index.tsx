@@ -132,6 +132,7 @@ export default function HomeScreen() {
     author: { username: string; display_name: string | null } | null;
   }>>([]);
   const [recommendedReviewers, setRecommendedReviewers] = useState<FollowRecommendation[]>([]);
+  const [reviewersLoaded, setReviewersLoaded] = useState(false);
   const [monthStats, setMonthStats] = useState<MonthStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const today = getKstToday();
@@ -483,9 +484,11 @@ export default function HomeScreen() {
     } else {
       setRecommendedReviewers([]);
     }
+    setReviewersLoaded(true);
   }
 
   useEffect(() => {
+    setReviewersLoaded(false);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
@@ -767,7 +770,18 @@ export default function HomeScreen() {
       </View>
 
       {/* 추천 리뷰어 (로그인 · taste-profile 유사도 기반) */}
-      {session && recommendedReviewers.length > 0 && (
+      {session && !reviewersLoaded && (
+        <View style={styles.recommend}>
+          <View style={styles.recommendHead}>
+            <Text style={styles.recommendTitle}>취향이 비슷한 리뷰어</Text>
+          </View>
+          <View style={styles.reviewerGrid}>
+            <ReviewerSkeleton />
+            <ReviewerSkeleton />
+          </View>
+        </View>
+      )}
+      {session && reviewersLoaded && recommendedReviewers.length > 0 && (
         <View style={styles.recommend}>
           <View style={styles.recommendHead}>
             <Text style={styles.recommendTitle}>취향이 비슷한 리뷰어</Text>
@@ -931,6 +945,25 @@ function MonthStatBox({
       <View style={styles.monthStatValueRow}>
         <Text style={styles.monthStatValue}>{value}</Text>
         {suffix && <Text style={styles.monthStatSuffix}>{suffix}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function ReviewerSkeleton() {
+  return (
+    <View style={styles.reviewerCard}>
+      <View style={styles.reviewerHeader}>
+        <View style={[styles.reviewerAvatar, styles.skeletonBox]} />
+        <View style={styles.reviewerHeaderText}>
+          <View style={[styles.skeletonLine, { width: "60%" }]} />
+          <View style={[styles.skeletonLine, { width: "40%", marginTop: 6 }]} />
+        </View>
+      </View>
+      <View style={styles.tagRow}>
+        <View style={[styles.skeletonPill, { width: 52 }]} />
+        <View style={[styles.skeletonPill, { width: 68 }]} />
+        <View style={[styles.skeletonPill, { width: 44 }]} />
       </View>
     </View>
   );
@@ -1196,4 +1229,11 @@ const styles = StyleSheet.create({
   },
   bottleScoreText: { color: "#fbbf24", fontSize: 15, fontWeight: "700" },
   bottleScoreCount: { color: "#525252", fontSize: 10 },
+
+  skeletonBox: { backgroundColor: "#1f1f1f" },
+  skeletonLine: { height: 10, borderRadius: 4, backgroundColor: "#1f1f1f" },
+  skeletonPill: {
+    height: 16, borderRadius: 999,
+    backgroundColor: "#1f1f1f",
+  },
 });

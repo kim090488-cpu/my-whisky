@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, Image,
   ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import {
@@ -193,22 +193,26 @@ function LoggedIn() {
   const [pushEnabled, setPushEnabledState] = useState<boolean>(false);
   const [pushBusy, setPushBusy] = useState(false);
 
+  const loadMe = useCallback(async () => {
+    if (!session) return;
+    const [pRes, tRes, cRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("username, display_name, avatar_url, follower_count, following_count")
+        .eq("id", session.user.id)
+        .maybeSingle(),
+      supabase.from("tastings").select("*", { count: "exact", head: true }).eq("user_id", session.user.id),
+      supabase.from("collection_items").select("*", { count: "exact", head: true }).eq("user_id", session.user.id),
+    ]);
+    setProfile(pRes.data);
+    setCounts({ tastings: tRes.count ?? 0, collection: cRes.count ?? 0 });
+  }, [session]);
+
   useEffect(() => {
     if (!session) return;
+    void loadMe();
+    // 본인의 푸시 구독 (가장 최근 1건) — 세션 바뀔 때만
     (async () => {
-      const [pRes, tRes, cRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("username, display_name, avatar_url, follower_count, following_count")
-          .eq("id", session.user.id)
-          .maybeSingle(),
-        supabase.from("tastings").select("*", { count: "exact", head: true }).eq("user_id", session.user.id),
-        supabase.from("collection_items").select("*", { count: "exact", head: true }).eq("user_id", session.user.id),
-      ]);
-      setProfile(pRes.data);
-      setCounts({ tastings: tRes.count ?? 0, collection: cRes.count ?? 0 });
-
-      // 본인의 푸시 구독 (가장 최근 1건)
       const { data: subs } = await supabase
         .from("push_subscriptions")
         .select("expo_push_token, enabled")
@@ -221,7 +225,15 @@ function LoggedIn() {
         setPushEnabledState(sub.enabled);
       }
     })();
-  }, [session]);
+  }, [session, loadMe]);
+
+  // Me 탭 focus 시마다 프로필·카운트 리프레시 (웹에서 프로필 수정 후 돌아왔을 때 or
+  // 다른 탭에서 노트·컬렉션 추가 후 돌아왔을 때 stale 방지)
+  useFocusEffect(
+    useCallback(() => {
+      void loadMe();
+    }, [loadMe]),
+  );
 
   async function enablePush() {
     if (!session) return;

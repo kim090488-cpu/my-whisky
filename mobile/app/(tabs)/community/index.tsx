@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator, RefreshControl, TextInput,
 } from "react-native";
@@ -50,6 +50,7 @@ export default function CommunityList() {
   const [cat, setCat] = useState<CatFilter>("all");
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
+  const listRef = useRef<FlatList<Post & { match?: MatchKind }>>(null);
 
   const load = useCallback(async () => {
     const query = q.trim();
@@ -137,6 +138,11 @@ export default function CommunityList() {
     const t = setTimeout(() => { void load(); }, q ? 250 : 0);
     return () => clearTimeout(t);
   }, [load, q]);
+
+  // 카테고리/검색어 바뀌면 스크롤 맨 위로 (첫 결과가 안 보이는 문제 방지)
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [cat, q]);
   useFocusEffect(useCallback(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []));
 
   return (
@@ -184,6 +190,7 @@ export default function CommunityList() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={items}
           keyExtractor={(p) => p.id}
           contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 96 }}

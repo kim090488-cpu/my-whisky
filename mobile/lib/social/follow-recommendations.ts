@@ -33,7 +33,7 @@ export type FollowRecommendation = {
   commonBottlings: CommonBottling[];
 };
 
-const CANDIDATE_POOL = 10;
+const CANDIDATE_POOL = 6;
 const MAX_RESULTS = 3;
 const COMMON_LOVE_MIN_SCORE = 85;
 const MAX_COMMON_BOTTLINGS = 2;

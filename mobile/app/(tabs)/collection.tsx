@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator, Alert,
-  BackHandler,
+  BackHandler, RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import {
@@ -41,6 +41,7 @@ export default function CollectionScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [status, setStatus] = useState<CollectionStatus | "all">("all");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingBottling, setPendingBottling] = useState<PickedBottling | null>(null);
   const [saving, setSaving] = useState<CollectionStatus | null>(null);
@@ -74,6 +75,14 @@ export default function CollectionScreen() {
     if (sessionLoading || !session) return;
     void load();
   }, [session, sessionLoading, load]);
+
+  // 다른 탭에서 위스키 추가/변경 후 돌아왔을 때 자동 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      if (sessionLoading || !session) return;
+      void load();
+    }, [session, sessionLoading, load]),
+  );
 
   // 안드로이드 하드웨어 뒤로가기: picker/상태선택 중이면 그 단계만 닫기 (홈 탭으로 튀지 않게)
   useEffect(() => {
@@ -208,6 +217,17 @@ export default function CollectionScreen() {
           data={items}
           keyExtractor={(i) => i.id}
           contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                await load();
+                setRefreshing(false);
+              }}
+              tintColor="#fbbf24"
+            />
+          }
           renderItem={({ item }) => (
             <Pressable
               onPress={() => item.bottling && router.push(`/whiskies/${item.bottling.id}`)}
@@ -224,11 +244,11 @@ export default function CollectionScreen() {
               {item.bottling && (
                 <>
                   {item.bottling.distillery && (
-                    <Text style={styles.cardDist}>
+                    <Text style={styles.cardDist} numberOfLines={1}>
                       {COUNTRY_FLAG[item.bottling.distillery.country]} {item.bottling.distillery.name}
                     </Text>
                   )}
-                  <Text style={styles.cardName}>{item.bottling.name}</Text>
+                  <Text style={styles.cardName} numberOfLines={2}>{item.bottling.name}</Text>
                   <Text style={styles.cardMeta}>
                     {formatAge(item.bottling.age_years)} · {formatAbv(item.bottling.abv)}
                   </Text>

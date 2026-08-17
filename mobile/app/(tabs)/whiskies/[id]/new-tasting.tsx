@@ -98,6 +98,7 @@ export default function NewTasting() {
   }
 
   async function submit() {
+    if (pending) return;
     if (score) {
       const n = Number(score);
       if (!Number.isFinite(n) || n < 0 || n > 100) {

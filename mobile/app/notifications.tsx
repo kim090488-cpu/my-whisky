@@ -244,8 +244,8 @@ function NotificationRow({
         <Ionicons name={meta.icon} color="#fff" size={14} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.message}>{message}</Text>
-        {subline && <Text style={styles.subline}>{subline}</Text>}
+        <Text style={styles.message} numberOfLines={2}>{message}</Text>
+        {subline && <Text style={styles.subline} numberOfLines={1}>{subline}</Text>}
         <Text style={styles.time}>{formatTime(row.created_at)}</Text>
       </View>
       {row.wasUnread && <View style={styles.unreadDot} />}
