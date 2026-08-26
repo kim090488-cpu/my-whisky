@@ -1,7 +1,65 @@
-import { Stack } from "expo-router";
+import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Constants from "expo-constants";
 import { SessionProvider } from "@/lib/auth-context";
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const version = Constants.expoConfig?.version ?? "";
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView style={errorStyles.root}>
+        <StatusBar style="light" />
+        <ScrollView contentContainerStyle={errorStyles.container}>
+          <Text style={errorStyles.title}>문제가 생겼어요</Text>
+          <Text style={errorStyles.subtitle}>
+            잠깐의 오류가 있었어요. 아래 버튼을 눌러 다시 시도해 주세요.{"\n"}
+            문제가 반복되면 앱을 완전히 종료했다가 다시 켜주세요.
+          </Text>
+          {__DEV__ && error?.message ? (
+            <View style={errorStyles.errorBox}>
+              <Text style={errorStyles.errorText}>{error.message}</Text>
+            </View>
+          ) : null}
+          <Pressable
+            style={({ pressed }) => [errorStyles.button, pressed && errorStyles.buttonPressed]}
+            onPress={retry}
+          >
+            <Text style={errorStyles.buttonText}>다시 시도</Text>
+          </Pressable>
+          {version ? <Text style={errorStyles.version}>my-whisky v{version}</Text> : null}
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
+
+const errorStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0a0a0a" },
+  container: { flexGrow: 1, justifyContent: "center", padding: 24, gap: 14 },
+  title: { fontSize: 22, fontWeight: "700", color: "#fafafa", textAlign: "center" },
+  subtitle: { fontSize: 14, color: "#a3a3a3", textAlign: "center", lineHeight: 21 },
+  errorBox: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#262626",
+    backgroundColor: "#111",
+  },
+  errorText: { color: "#fca5a5", fontSize: 12, fontFamily: "monospace" },
+  button: {
+    marginTop: 16,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: "center",
+    backgroundColor: "#fbbf24",
+  },
+  buttonPressed: { opacity: 0.85 },
+  buttonText: { color: "#0a0a0a", fontSize: 15, fontWeight: "700" },
+  version: { marginTop: 24, fontSize: 11, color: "#525252", textAlign: "center" },
+});
 
 export default function RootLayout() {
   return (
