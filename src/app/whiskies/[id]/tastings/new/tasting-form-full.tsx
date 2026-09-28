@@ -517,8 +517,6 @@ export function TastingFormFull({
                   onChange={(v) => set("sweetness", v)} />
                 <Slider10 label="스모키" value={state.smokiness}
                   onChange={(v) => set("smokiness", v)} />
-                <Slider10 label="과일맛" value={state.fruitiness}
-                  onChange={(v) => set("fruitiness", v)} />
                 <Slider10 label="스파이시" value={state.spiciness}
                   onChange={(v) => set("spiciness", v)} />
                 <Slider10 label="부드러움" value={state.smoothness}

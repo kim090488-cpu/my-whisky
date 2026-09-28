@@ -22,11 +22,14 @@ const SOURCE_OPTIONS: { key: BarcodeSource; label: string }[] = [
 ];
 
 export default function NewBottling() {
-  const { barcode } = useLocalSearchParams<{ barcode?: string }>();
+  const { barcode, prefillName } = useLocalSearchParams<{
+    barcode?: string;
+    prefillName?: string;
+  }>();
   const router = useRouter();
   const { session } = useSession();
 
-  const [nameKr, setNameKr] = useState("");
+  const [nameKr, setNameKr] = useState(prefillName ?? "");
   const [name, setName] = useState("");
   const [ageYears, setAgeYears] = useState("");
   const [abv, setAbv] = useState("");

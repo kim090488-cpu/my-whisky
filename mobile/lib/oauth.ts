@@ -1,4 +1,6 @@
 import * as Linking from "expo-linking";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { Platform } from "react-native";
 import { supabase } from "./supabase";
 
 export type OAuthProvider = "google" | "kakao";
@@ -34,4 +36,36 @@ export async function signInWithProvider(provider: OAuthProvider): Promise<Resul
 
   // 실제 세션 교환은 app/auth/callback.tsx가 딥링크로 앱 복귀 시 처리
   return { ok: true };
+}
+
+// Apple은 iOS 네이티브 API. identityToken을 받아 supabase.auth.signInWithIdToken으로
+// 바로 세션 교환 (브라우저 라운드트립 없음). App Store Guideline 4.8 대응.
+// Android/웹은 Apple provider의 브라우저 OAuth 폴백을 쓸 수도 있지만 UX가 나빠서 iOS 전용
+export async function signInWithApple(): Promise<Result> {
+  if (Platform.OS !== "ios") {
+    return { ok: false, error: "Apple 로그인은 iOS 기기에서만 지원해요." };
+  }
+  try {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    if (!credential.identityToken) {
+      return { ok: false, error: "Apple ID 토큰을 받지 못했어요." };
+    }
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: "apple",
+      token: credential.identityToken,
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e: unknown) {
+    // 사용자가 시트를 닫은 경우
+    if (e && typeof e === "object" && "code" in e && e.code === "ERR_REQUEST_CANCELED") {
+      return { ok: false, cancelled: true };
+    }
+    return { ok: false, error: e instanceof Error ? e.message : "Apple 로그인 실패" };
+  }
 }

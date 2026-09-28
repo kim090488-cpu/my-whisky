@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
+  Dimensions,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSession } from "@/lib/auth-context";
@@ -64,6 +67,18 @@ type FollowNote = MyRecentNote & {
 const RECOMMEND_COUNT = 4;
 const POOL = 12;
 const MY_RECENT_COUNT = 4;
+
+const HERO_IMAGES = [
+  require("../../assets/hero/hero1.jpg"),
+  require("../../assets/hero/hero2.jpg"),
+  require("../../assets/hero/hero3.jpg"),
+];
+const HERO_INTERVAL_MS = 5000;
+const HERO_FADE_MS = 800;
+const HERO_SOURCE_W = 682;
+const HERO_SOURCE_H = 400;
+const SCREEN_W = Dimensions.get("window").width;
+const HERO_HEIGHT = Math.round((SCREEN_W * HERO_SOURCE_H) / HERO_SOURCE_W);
 
 const TAG_TONE_STYLES: Record<
   TasteTagTone,
@@ -510,15 +525,7 @@ export default function HomeScreen() {
       }
     >
       {/* Hero */}
-      <View style={styles.hero}>
-        <Text style={styles.tag}>· 한국 위스키 커뮤니티</Text>
-        <Text style={styles.heroTitle}>
-          한 잔에서{"\n"}기억으로<Text style={styles.accentDot}>.</Text>
-        </Text>
-        <Text style={styles.heroLead}>
-          보틀링을 찾고, 향과 맛을 기록하고, 다른 사람의 노트를 함께 봅니다.
-        </Text>
-      </View>
+      <HeroCarousel />
 
       {/* 탐색 카드 4개 */}
       <View style={styles.discoverGrid}>
@@ -921,6 +928,47 @@ export default function HomeScreen() {
   );
 }
 
+function HeroCarousel() {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, HERO_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <View style={styles.hero}>
+      <ExpoImage
+        source={HERO_IMAGES[activeIndex]}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        transition={HERO_FADE_MS}
+      />
+      <LinearGradient
+        colors={["rgba(10,10,10,0)", "rgba(10,10,10,0.55)"]}
+        locations={[0.75, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <View style={styles.heroTextArea} pointerEvents="none">
+        <Text style={styles.heroBrandLine}>whiskey blind</Text>
+        <Text style={styles.heroBrandCross}>×</Text>
+        <Text style={styles.heroBrandLine}>ds.whiskey</Text>
+      </View>
+      <View style={styles.heroDots} pointerEvents="none">
+        {HERO_IMAGES.map((_, i) => (
+          <View
+            key={i}
+            style={[styles.heroDot, activeIndex === i && styles.heroDotActive]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <View style={styles.statBox}>
@@ -995,18 +1043,62 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0a0a0a" },
   content: { paddingBottom: 32 },
 
-  hero: { paddingHorizontal: 20, paddingTop: 36, paddingBottom: 24 },
-  tag: { color: "#737373", fontSize: 11, letterSpacing: 1, textTransform: "uppercase" },
-  heroTitle: {
-    color: "#fafafa",
-    fontSize: 38,
-    fontWeight: "700",
-    letterSpacing: -1,
-    lineHeight: 42,
-    marginTop: 14,
+  hero: {
+    width: SCREEN_W,
+    height: HERO_HEIGHT,
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: "#0a0a0a",
   },
-  accentDot: { color: "#fbbf24" },
-  heroLead: { color: "#a3a3a3", fontSize: 14, lineHeight: 21, marginTop: 14 },
+  heroTextArea: {
+    position: "absolute",
+    left: 22,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
+  heroBrandLine: {
+    color: "#fafafa",
+    fontFamily: "serif",
+    fontSize: 22,
+    fontWeight: "300",
+    letterSpacing: -0.3,
+    lineHeight: 26,
+    textShadowColor: "rgba(0,0,0,0.85)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
+  heroBrandCross: {
+    color: "#fafafa",
+    fontFamily: "serif",
+    fontSize: 14,
+    fontWeight: "300",
+    marginLeft: 32,
+    marginVertical: 2,
+    textShadowColor: "rgba(0,0,0,0.85)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
+  heroDots: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  heroDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.35)",
+  },
+  heroDotActive: {
+    backgroundColor: "#fbbf24",
+    width: 18,
+  },
 
   discoverGrid: {
     flexDirection: "row",

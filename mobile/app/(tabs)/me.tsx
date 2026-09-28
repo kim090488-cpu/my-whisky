@@ -6,12 +6,13 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useSession } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import {
   registerForPushNotifications, setPushEnabled, sendTestPush,
 } from "@/lib/push";
-import { signInWithProvider, type OAuthProvider } from "@/lib/oauth";
+import { signInWithProvider, signInWithApple, type OAuthProvider } from "@/lib/oauth";
 
 export default function MeScreen() {
   const { session, loading } = useSession();
@@ -34,7 +35,14 @@ function LoggedOut() {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [oauthPending, setOauthPending] = useState<OAuthProvider | null>(null);
+  const [oauthPending, setOauthPending] = useState<OAuthProvider | "apple" | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
+    }
+  }, []);
 
   async function submit() {
     setError(null);
@@ -75,6 +83,19 @@ function LoggedOut() {
     }
   }
 
+  async function apple() {
+    setError(null);
+    setOauthPending("apple");
+    try {
+      const res = await signInWithApple();
+      if (!res.ok && !("cancelled" in res && res.cancelled)) {
+        setError("error" in res ? res.error : "로그인에 실패했어요.");
+      }
+    } finally {
+      setOauthPending(null);
+    }
+  }
+
   const busy = pending || oauthPending !== null;
 
   return (
@@ -105,6 +126,16 @@ function LoggedOut() {
             {oauthPending === "google" ? "Google로 이동 중…" : "Google로 계속하기"}
           </Text>
         </Pressable>
+
+        {appleAvailable && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={8}
+            style={styles.appleButton}
+            onPress={apple}
+          />
+        )}
 
         <Pressable
           onPress={() => oauth("kakao")}
@@ -529,6 +560,7 @@ const styles = StyleSheet.create({
   oauthGoogleText: { color: "#171717", fontWeight: "600", fontSize: 15 },
   oauthKakao: { backgroundColor: "#FEE500" },
   oauthKakaoText: { color: "#191919", fontWeight: "600", fontSize: 15 },
+  appleButton: { width: "100%", height: 46 },
   divider: {
     flexDirection: "row",
     alignItems: "center",

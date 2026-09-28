@@ -11,7 +11,6 @@ export type FlavorValues = {
 const AXES = [
   { key: "sweetness",     label: "단맛" },
   { key: "smokiness",     label: "스모키" },
-  { key: "fruitiness",    label: "과일맛" },
   { key: "spiciness",     label: "스파이시" },
   { key: "finish_length", label: "여운" },
   { key: "complexity",    label: "복잡도" },

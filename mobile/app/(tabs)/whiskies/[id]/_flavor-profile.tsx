@@ -14,7 +14,6 @@ export type FlavorProfileData = {
 const AXES = [
   { key: "avg_sweetness",     label: "단맛" },
   { key: "avg_smokiness",     label: "스모키" },
-  { key: "avg_fruitiness",    label: "과일맛" },
   { key: "avg_spiciness",     label: "스파이시" },
   { key: "avg_finish_length", label: "여운" },
   { key: "avg_complexity",    label: "복잡도" },

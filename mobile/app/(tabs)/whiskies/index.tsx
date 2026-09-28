@@ -4,6 +4,7 @@ import {
   ActivityIndicator, RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { COUNTRY_FLAG, formatAge, formatAbv } from "@/lib/format";
 import type { WhiskyCountry } from "@/types/database";
@@ -129,23 +130,28 @@ export default function WhiskiesIndex() {
           autoCorrect={false}
           style={styles.searchInput}
         />
+      </View>
+      <View style={styles.actionRow}>
         <Pressable
-          onPress={() => router.push("/whiskies/compare" as never)}
-          style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push("/whiskies/scan")}
+          style={({ pressed }) => [styles.actionBtn, styles.actionBtnPrimary, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.scanBtnText}>⚖</Text>
+          <Ionicons name="barcode-outline" size={18} color="#0a0a0a" />
+          <Text style={styles.actionBtnPrimaryText}>바코드 인식</Text>
         </Pressable>
         <Pressable
           onPress={() => router.push("/(tabs)/whiskies/new" as never)}
-          style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.scanBtnText}>+</Text>
+          <Ionicons name="add" size={18} color="#fafafa" />
+          <Text style={styles.actionBtnText}>추가</Text>
         </Pressable>
         <Pressable
-          onPress={() => router.push("/whiskies/scan")}
-          style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push("/whiskies/compare" as never)}
+          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.scanBtnText}>📷</Text>
+          <Ionicons name="git-compare-outline" size={16} color="#fafafa" />
+          <Text style={styles.actionBtnText}>비교</Text>
         </Pressable>
       </View>
 
@@ -190,10 +196,31 @@ export default function WhiskiesIndex() {
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator color="#fbbf24" style={{ marginTop: 40 }} />
+          ) : q ? (
+            <View style={styles.emptyBlock}>
+              <Text style={styles.empty}>
+                &quot;{q}&quot;에 대한 결과가 없어요.
+              </Text>
+              <Text style={styles.emptyHint}>
+                카탈로그에 없는 위스키라면 직접 등록해보세요.
+              </Text>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/whiskies/new",
+                    params: { prefillName: q.trim() },
+                  } as never)
+                }
+                style={({ pressed }) => [styles.emptyCta, pressed && { opacity: 0.8 }]}
+              >
+                <Ionicons name="add" size={16} color="#0a0a0a" />
+                <Text style={styles.emptyCtaText}>
+                  &quot;{q.trim()}&quot; 새 위스키로 등록
+                </Text>
+              </Pressable>
+            </View>
           ) : (
-            <Text style={styles.empty}>
-              {q ? `"${q}"에 대한 결과가 없어요.` : "보틀링이 없습니다."}
-            </Text>
+            <Text style={styles.empty}>보틀링이 없습니다.</Text>
           )
         }
         contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 24 }}
@@ -213,14 +240,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10,
     borderRadius: 8, fontSize: 14,
   },
-  scanBtn: {
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
     backgroundColor: "#171717",
     borderWidth: 1, borderColor: "#262626",
-    paddingHorizontal: 14,
+    paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 8,
-    alignItems: "center", justifyContent: "center",
   },
-  scanBtnText: { fontSize: 20 },
+  actionBtnText: { color: "#fafafa", fontSize: 13, fontWeight: "500" },
+  actionBtnPrimary: {
+    flex: 1,
+    backgroundColor: "#fbbf24",
+    borderColor: "#fbbf24",
+  },
+  actionBtnPrimaryText: { color: "#0a0a0a", fontSize: 13, fontWeight: "700" },
   card: {
     backgroundColor: "#171717",
     borderWidth: 1, borderColor: "#262626",
@@ -236,4 +278,17 @@ const styles = StyleSheet.create({
   cardName: { color: "#fafafa", fontSize: 15, fontWeight: "500", marginTop: 4 },
   cardMeta: { color: "#a3a3a3", fontSize: 12, marginTop: 4 },
   empty: { color: "#737373", textAlign: "center", marginTop: 60, fontSize: 14 },
+  emptyBlock: { alignItems: "center", marginTop: 60, paddingHorizontal: 24, gap: 8 },
+  emptyHint: { color: "#525252", fontSize: 12, textAlign: "center" },
+  emptyCta: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fbbf24",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  emptyCtaText: { color: "#0a0a0a", fontSize: 13, fontWeight: "700" },
 });

@@ -140,7 +140,7 @@ export function WhiskyFilters({ filters, regionsByCountry }: Props) {
 }
 
 const selectCls =
-  "w-full rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors focus:border-ring focus:outline-none";
+  "w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors focus:border-ring focus:outline-none";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -169,7 +169,7 @@ function NumberInput({
       onBlur={onBlur}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
       placeholder={placeholder}
-      className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm placeholder:text-muted-foreground/50 focus:border-ring focus:outline-none"
+      className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-ring focus:outline-none"
     />
   );
 }

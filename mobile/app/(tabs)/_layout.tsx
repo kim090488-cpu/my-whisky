@@ -80,6 +80,7 @@ export default function TabsLayout() {
         name="whiskies"
         options={{
           title: "위스키",
+          headerShown: false,
           tabBarIcon: ({ color }) => <Ionicons name="wine-outline" color={color} size={22} />,
         }}
       />
@@ -91,6 +92,7 @@ export default function TabsLayout() {
         name="community"
         options={{
           title: "커뮤니티",
+          headerShown: false,
           tabBarIcon: ({ color }) => <Ionicons name="chatbubbles-outline" color={color} size={22} />,
         }}
       />

@@ -125,8 +125,8 @@ export default async function WhiskiesPage({ searchParams }: { searchParams: Sea
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[220px_1fr]">
         {/* Filters */}
         <div>
-          <details className="rounded-lg border border-border bg-card/40 p-4 lg:hidden">
-            <summary className="cursor-pointer text-sm font-medium text-foreground/80">필터</summary>
+          <details className="rounded-lg border border-border bg-card p-4 lg:hidden">
+            <summary className="cursor-pointer text-sm font-medium text-foreground">필터</summary>
             <div className="mt-4">
               <WhiskyFilters filters={filters} regionsByCountry={regionsByCountry} />
             </div>

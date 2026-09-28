@@ -54,3 +54,7 @@ supabase/.temp
 mobile/firebase-service-account*.json
 mobile/*-firebase-adminsdk-*.json
 mobile/google-services.json
+
+# Apple Sign in with Apple private keys (.p8) — never commit
+*.p8
+AuthKey_*.p8

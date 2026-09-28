@@ -18,6 +18,7 @@ import { loadBottlingFans, type BottlingFan } from "@/lib/social/bottling-fans";
 import { BottlingFansSection } from "@/components/social/bottling-fans-section";
 import { TastingCard } from "@/components/social/tasting-card";
 import { CollectionPicker } from "@/components/whisky/collection-picker";
+import { ReportButton } from "@/components/report-button";
 
 type BarcodeSource = "manufacturer" | "importer" | "retailer" | "unknown";
 const SOURCE_LABEL: Record<BarcodeSource, string> = {
@@ -251,16 +252,32 @@ export default function BottlingDetail() {
             onPress={() => router.push(`/(tabs)/whiskies/${b.id}/edit` as never)}
             style={({ pressed }) => [styles.editLinkRow, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.editLinkText}>정보 수정 (누구나 편집 가능)</Text>
+            <Ionicons name="create-outline" size={13} color="#a3a3a3" />
+            <Text style={styles.editLinkText}>정보 수정</Text>
           </Pressable>
         )}
         <Pressable
           onPress={() => router.push(`/(tabs)/whiskies/${b.id}/history` as never)}
           style={({ pressed }) => [styles.editLinkRow, pressed && { opacity: 0.7 }]}
         >
-          <Text style={styles.editLinkText}>수정 이력 · 추천</Text>
+          <Ionicons name="time-outline" size={13} color="#a3a3a3" />
+          <Text style={styles.editLinkText}>수정 이력</Text>
         </Pressable>
+        <View style={styles.editLinkRow}>
+          <Ionicons name="flag-outline" size={13} color="#a3a3a3" />
+          <ReportButton
+            targetTable="bottling"
+            targetId={b.id}
+            ownerId={null}
+            currentUserId={session?.user.id ?? null}
+            compact={false}
+            label="신고"
+          />
+        </View>
       </View>
+      <Text style={styles.editHint}>
+        누구나 수정할 수 있어요. 잘못된 정보는 이력에서 되돌리거나 신고해주세요.
+      </Text>
 
       {verdict && verdict.total_reviews > 0 && <FlavorProfile data={verdict} />}
 
@@ -352,9 +369,27 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: "#171717", marginTop: 8,
   },
   sectionTitle: { color: "#fafafa", fontSize: 16, fontWeight: "600" },
-  editLinkGroup: { flexDirection: "row", justifyContent: "center", gap: 16, marginTop: 4 },
-  editLinkRow: { paddingHorizontal: 8, paddingVertical: 8 },
-  editLinkText: { color: "#a3a3a3", fontSize: 12, fontStyle: "italic" },
+  editLinkGroup: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
+  editLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+  },
+  editLinkText: { color: "#a3a3a3", fontSize: 12 },
+  editHint: {
+    color: "#525252",
+    fontSize: 11,
+    textAlign: "center",
+    paddingHorizontal: 24,
+    marginTop: 4,
+  },
   writeButton: {
     backgroundColor: "#fbbf24",
     paddingHorizontal: 14, paddingVertical: 7,

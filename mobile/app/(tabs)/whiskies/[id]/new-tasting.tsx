@@ -293,7 +293,6 @@ export default function NewTasting() {
         </View>
         <FlavorAxis label="단맛" value={sweetness} onChange={setSweetness} />
         <FlavorAxis label="스모키" value={smokiness} onChange={setSmokiness} />
-        <FlavorAxis label="과일맛" value={fruitiness} onChange={setFruitiness} />
         <FlavorAxis label="스파이시" value={spiciness} onChange={setSpiciness} />
         <FlavorAxis label="부드러움" value={smoothness} onChange={setSmoothness} />
         <FlavorAxis label="복잡도" value={complexity} onChange={setComplexity} />
