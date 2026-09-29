@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GlassWater, NotebookPen, TrendingUp, Sparkles, ArrowRight } from "lucide-react";
+import { GlassWater, NotebookPen, TrendingUp, Sparkles, ArrowRight, MessageCircle, Camera, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/avatar";
 import { BottleCard } from "@/components/bottle/bottle-card";
@@ -316,9 +316,30 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* 카테고리 4 카드 */}
+      {/* 노트 작성 CTA (로그인 시) */}
+      {user && (
+        <section className="mx-auto max-w-6xl px-6 pb-8">
+          <Link
+            href="/tastings/new"
+            className="group flex items-center gap-4 rounded-xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+          >
+            <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <PenLine className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-primary">노트 작성</div>
+              <div className="text-xs text-muted-foreground">
+                위스키를 선택해 시음 기록을 남겨보세요
+              </div>
+            </div>
+            <ArrowRight className="size-4 text-primary transition-transform group-hover:translate-x-1" />
+          </Link>
+        </section>
+      )}
+
+      {/* 카테고리 카드 */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FeatureCard
             href="/whiskies"
             icon={<GlassWater className="size-5" />}
@@ -343,6 +364,20 @@ export default async function HomePage({
             title="맞춤 추천"
             body="다시 사고 싶은 · 처음이라면 · 선물용 · 가성비 갑."
           />
+          <FeatureCard
+            href="/curator"
+            icon={<MessageCircle className="size-5" />}
+            title="AI 큐레이터"
+            body="취향 기반 추천 대화, 채팅으로 물어보세요."
+          />
+          {user && (
+            <FeatureCard
+              href="/posts?mine=1"
+              icon={<Camera className="size-5" />}
+              title="내 모먼트"
+              body="내가 올린 사진과 순간을 모아보기."
+            />
+          )}
         </div>
       </section>
 
