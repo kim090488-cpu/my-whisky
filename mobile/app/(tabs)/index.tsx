@@ -527,6 +527,23 @@ export default function HomeScreen() {
       {/* Hero */}
       <HeroCarousel />
 
+      {/* 노트 작성 CTA (로그인 시) */}
+      {session && (
+        <Pressable
+          onPress={() => router.push("/whiskies" as never)}
+          style={({ pressed }) => [styles.writeCta, pressed && { opacity: 0.85 }]}
+        >
+          <View style={styles.writeCtaIcon}>
+            <Ionicons name="create-outline" size={20} color="#0a0a0a" />
+          </View>
+          <View style={styles.writeCtaText}>
+            <Text style={styles.writeCtaTitle}>노트 작성</Text>
+            <Text style={styles.writeCtaDesc}>위스키를 선택해 시음 기록을 남겨보세요</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#fbbf24" />
+        </Pressable>
+      )}
+
       {/* 탐색 카드 4개 */}
       <View style={styles.discoverGrid}>
         <DiscoverCard
@@ -553,6 +570,20 @@ export default function HomeScreen() {
           desc="공개된 후기 둘러보기"
           onPress={() => router.push("/tastings")}
         />
+        <DiscoverCard
+          icon="chatbubble-ellipses-outline"
+          title="AI 큐레이터"
+          desc="취향 기반 추천 대화"
+          onPress={() => router.push("/curator" as never)}
+        />
+        {session && (
+          <DiscoverCard
+            icon="camera-outline"
+            title="내 모먼트"
+            desc="내가 올린 사진 모아보기"
+            onPress={() => router.push("/posts?mine=1" as never)}
+          />
+        )}
       </View>
 
       {/* 통계 */}
@@ -1100,7 +1131,33 @@ const styles = StyleSheet.create({
     width: 18,
   },
 
+  writeCta: {
+    marginTop: 16,
+    marginHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.4)",
+    backgroundColor: "rgba(251,191,36,0.08)",
+  },
+  writeCtaIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#fbbf24",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  writeCtaText: { flex: 1 },
+  writeCtaTitle: { color: "#fde68a", fontSize: 15, fontWeight: "700" },
+  writeCtaDesc: { color: "#a3a3a3", fontSize: 11, marginTop: 2 },
+
   discoverGrid: {
+    marginTop: 16,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
