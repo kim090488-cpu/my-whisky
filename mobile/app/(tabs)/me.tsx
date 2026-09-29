@@ -446,9 +446,11 @@ function LoggedIn() {
                   {pushEnabled ? "ON" : "OFF"}
                 </Text>
               </Pressable>
-              <Pressable onPress={testPush}>
-                <Text style={styles.pushTest}>테스트 발송</Text>
-              </Pressable>
+              {__DEV__ && (
+                <Pressable onPress={testPush}>
+                  <Text style={styles.pushTest}>테스트 발송</Text>
+                </Pressable>
+              )}
             </View>
             <Text style={styles.pushHint} numberOfLines={1}>
               {pushToken.slice(0, 30)}…
