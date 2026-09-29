@@ -545,6 +545,37 @@ export interface Database {
         }>;
         Relationships: [];
       };
+      feedback: {
+        Row: {
+          id: string;
+          user_id: string;
+          category: "bug" | "suggestion" | "question" | "other";
+          subject: string;
+          body: string;
+          status: "open" | "in_progress" | "resolved";
+          admin_note: string | null;
+          app_version: string | null;
+          platform: string | null;
+          created_at: string;
+          updated_at: string;
+          resolved_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          category?: "bug" | "suggestion" | "question" | "other";
+          subject: string;
+          body: string;
+          admin_note?: string | null;
+          app_version?: string | null;
+          platform?: string | null;
+        };
+        Update: Partial<{
+          status: "open" | "in_progress" | "resolved";
+          admin_note: string | null;
+          resolved_at: string | null;
+        }>;
+        Relationships: [];
+      };
       bottling_images: {
         Row: {
           id: string;

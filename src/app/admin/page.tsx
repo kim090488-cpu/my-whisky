@@ -22,7 +22,7 @@ export default async function AdminDashboardPage() {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const nowIso = new Date().toISOString();
   const [
-    newProfilesC, newTastingsC, openReportsC, suspendedC, hiddenTastingsC, hiddenCommentsC,
+    newProfilesC, newTastingsC, openReportsC, suspendedC, hiddenTastingsC, hiddenCommentsC, openFeedbackC,
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }).gt("created_at", since),
     supabase.from("tastings").select("*", { count: "exact", head: true }).gt("created_at", since),
@@ -30,6 +30,7 @@ export default async function AdminDashboardPage() {
     supabase.from("profiles").select("*", { count: "exact", head: true }).gt("suspended_until", nowIso),
     supabase.from("tastings").select("*", { count: "exact", head: true }).not("hidden_at", "is", null),
     supabase.from("tasting_comments").select("*", { count: "exact", head: true }).not("hidden_at", "is", null),
+    supabase.from("feedback").select("*", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
   ]);
 
   // 최근 admin 액션 10개
@@ -100,6 +101,26 @@ export default async function AdminDashboardPage() {
           </Link>
           <Stat label="숨김 노트" value={hiddenTastingsC.count ?? 0} />
           <Stat label="숨김 댓글" value={hiddenCommentsC.count ?? 0} />
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">문의·건의</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Link
+            href="/admin/feedback?status=open"
+            className={
+              "rounded-lg border p-4 transition " +
+              ((openFeedbackC.count ?? 0) > 0
+                ? "border-amber-900/50 bg-amber-950/30 hover:border-amber-700"
+                : "border-neutral-800 bg-neutral-900/40 hover:border-neutral-600")
+            }
+          >
+            <div className="text-xs uppercase tracking-wide text-neutral-500">미처리 문의</div>
+            <div className={"mt-1 text-2xl font-semibold " + ((openFeedbackC.count ?? 0) > 0 ? "text-amber-300" : "")}>
+              {(openFeedbackC.count ?? 0).toLocaleString()}
+            </div>
+          </Link>
         </div>
       </section>
 
