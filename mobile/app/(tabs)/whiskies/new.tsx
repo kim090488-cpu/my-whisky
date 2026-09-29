@@ -1,14 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet,
-  KeyboardAvoidingView, Platform, Alert,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/auth-context";
-import { CASK_LABEL, BOTTLER_LABEL } from "@/lib/format";
-import type { CaskType, BottlerKind } from "@/types/database";
+import { CASK_LABEL, BOTTLER_LABEL, COUNTRY_FLAG } from "@/lib/format";
+import type { CaskType, BottlerKind, WhiskyCountry } from "@/types/database";
+
+type DuplicateHit = {
+  id: string;
+  name: string;
+  name_kr: string | null;
+  age_years: number | null;
+  distillery_name: string;
+  distillery_name_kr: string | null;
+  country: WhiskyCountry;
+  tasting_count: number;
+};
 
 const CASKS: CaskType[] = ["bourbon", "sherry", "port", "wine", "rum", "virgin_oak", "refill", "mixed", "other", "unknown"];
 const BOTTLERS: BottlerKind[] = ["official", "independent", "private"];
@@ -38,6 +50,50 @@ export default function NewBottling() {
   const [source, setSource] = useState<BarcodeSource>("unknown");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [dupes, setDupes] = useState<DuplicateHit[]>([]);
+  const [dupeChecking, setDupeChecking] = useState(false);
+  const [dupeDismissed, setDupeDismissed] = useState(false);
+
+  // 한글 이름 입력에 debounce 검색 — 이미 등록된 유사 이름 노출
+  useEffect(() => {
+    const q = nameKr.trim();
+    if (q.length < 2) {
+      setDupes([]);
+      setDupeChecking(false);
+      return;
+    }
+    setDupeChecking(true);
+    const safe = q.replace(/[%_\\]/g, (m) => `\\${m}`);
+    const pattern = `%${safe}%`;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const [krRes, enRes] = await Promise.all([
+        supabase
+          .from("bottling_card_stats")
+          .select("id, name, name_kr, age_years, distillery_name, distillery_name_kr, country, tasting_count")
+          .ilike("name_kr", pattern)
+          .limit(5),
+        supabase
+          .from("bottling_card_stats")
+          .select("id, name, name_kr, age_years, distillery_name, distillery_name_kr, country, tasting_count")
+          .ilike("name", pattern)
+          .limit(5),
+      ]);
+      if (cancelled) return;
+      const map = new Map<string, DuplicateHit>();
+      for (const row of [...(krRes.data ?? []), ...(enRes.data ?? [])] as DuplicateHit[]) {
+        if (!map.has(row.id)) map.set(row.id, row);
+      }
+      setDupes(Array.from(map.values()).slice(0, 5));
+      setDupeChecking(false);
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setDupeChecking(false);
+    };
+  }, [nameKr]);
 
   function intOrNull(v: string): number | null {
     const s = v.trim();
@@ -138,12 +194,55 @@ export default function NewBottling() {
         <Text style={styles.lead}>최소 정보만 입력해도 됩니다. 상세는 나중에 편집 가능.</Text>
 
         <View style={{ gap: 6 }}>
-          <Text style={styles.label}>한글 이름 *</Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>한글 이름 *</Text>
+            {dupeChecking && <ActivityIndicator size="small" color="#737373" />}
+          </View>
           <TextInput
-            value={nameKr} onChangeText={setNameKr} maxLength={200}
+            value={nameKr}
+            onChangeText={(v) => { setNameKr(v); setDupeDismissed(false); }}
+            maxLength={200}
             placeholder="예: 맥켈란 12년 셰리 오크"
             placeholderTextColor="#525252" style={styles.input}
           />
+          {!dupeDismissed && dupes.length > 0 && (
+            <View style={styles.dupeCard}>
+              <View style={styles.dupeHead}>
+                <View style={styles.dupeHeadLeft}>
+                  <Ionicons name="warning-outline" size={14} color="#fbbf24" />
+                  <Text style={styles.dupeTitle}>이미 등록된 위스키가 있어요</Text>
+                </View>
+                <Pressable onPress={() => setDupeDismissed(true)} hitSlop={8}>
+                  <Text style={styles.dupeDismiss}>무시</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.dupeHint}>중복 등록을 피해주세요. 탭하면 상세로 이동해요.</Text>
+              <View style={{ gap: 6 }}>
+                {dupes.map((d) => (
+                  <Pressable
+                    key={d.id}
+                    onPress={() => router.replace(`/(tabs)/whiskies/${d.id}` as never)}
+                    style={({ pressed }) => [styles.dupeRow, pressed && { opacity: 0.7 }]}
+                  >
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.dupeDist} numberOfLines={1}>
+                        {COUNTRY_FLAG[d.country]}{" "}
+                        {d.distillery_name_kr ?? d.distillery_name}
+                      </Text>
+                      <Text style={styles.dupeName} numberOfLines={2}>
+                        {d.name_kr ?? d.name}
+                        {d.age_years !== null ? ` · ${d.age_years}년` : ""}
+                      </Text>
+                    </View>
+                    <View style={styles.dupeMetaCol}>
+                      <Text style={styles.dupeCount}>노트 {d.tasting_count}</Text>
+                      <Ionicons name="chevron-forward" size={14} color="#525252" />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={{ gap: 6 }}>
@@ -227,4 +326,39 @@ const styles = StyleSheet.create({
   },
   barcodeLabel: { color: "#a3a3a3", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   barcodeValue: { color: "#fbbf24", fontSize: 14, fontWeight: "600", letterSpacing: 1 },
+
+  labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+
+  dupeCard: {
+    marginTop: 6,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.35)",
+    backgroundColor: "rgba(251,191,36,0.06)",
+    gap: 8,
+  },
+  dupeHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dupeHeadLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dupeTitle: { color: "#fde68a", fontSize: 12, fontWeight: "700" },
+  dupeDismiss: { color: "#a3a3a3", fontSize: 11 },
+  dupeHint: { color: "#a3a3a3", fontSize: 11, lineHeight: 16 },
+  dupeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#171717",
+    borderWidth: 1,
+    borderColor: "#262626",
+  },
+  dupeDist: { color: "#a3a3a3", fontSize: 11 },
+  dupeName: { color: "#fafafa", fontSize: 13, fontWeight: "500", marginTop: 2 },
+  dupeMetaCol: { alignItems: "flex-end", gap: 2 },
+  dupeCount: { color: "#737373", fontSize: 10 },
 });
