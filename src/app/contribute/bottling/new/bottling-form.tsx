@@ -1,9 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { createBottling, updateBottling } from "@/lib/contribute/actions";
+import { createClient } from "@/lib/supabase/client";
 import { CASK_LABEL, BOTTLER_LABEL, COUNTRY_FLAG, COUNTRY_LABEL } from "@/lib/format";
 import type { CaskType, BottlerKind, WhiskyCountry } from "@/types/database";
+
+type DuplicateHit = {
+  id: string;
+  name: string;
+  name_kr: string | null;
+  age_years: number | null;
+  distillery_name: string | null;
+  distillery_name_kr: string | null;
+  country: WhiskyCountry;
+  tasting_count: number;
+};
 
 type Distillery = {
   id: string;
@@ -49,6 +63,42 @@ export function BottlingForm({
   const [pending, startTransition] = useTransition();
   const [bottler, setBottler] = useState<BottlerKind>(init?.bottler ?? "official");
 
+  const [nameKr, setNameKr] = useState(init?.name_kr ?? "");
+  const [dupes, setDupes] = useState<DuplicateHit[]>([]);
+  const [dupeDismissed, setDupeDismissed] = useState(false);
+
+  // 신규 등록에만 중복 검색 — 수정 모드에선 스킵
+  useEffect(() => {
+    if (isEdit) return;
+    const q = nameKr.trim();
+    if (q.length < 2) { setDupes([]); return; }
+    const supabase = createClient();
+    const safe = q.replace(/[%_\\]/g, (m) => `\\${m}`);
+    const pattern = `%${safe}%`;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const [krRes, enRes] = await Promise.all([
+        supabase
+          .from("bottling_card_stats")
+          .select("id, name, name_kr, age_years, distillery_name, distillery_name_kr, country, tasting_count")
+          .ilike("name_kr", pattern)
+          .limit(5),
+        supabase
+          .from("bottling_card_stats")
+          .select("id, name, name_kr, age_years, distillery_name, distillery_name_kr, country, tasting_count")
+          .ilike("name", pattern)
+          .limit(5),
+      ]);
+      if (cancelled) return;
+      const map = new Map<string, DuplicateHit>();
+      for (const row of [...(krRes.data ?? []), ...(enRes.data ?? [])] as DuplicateHit[]) {
+        if (row.id && !map.has(row.id)) map.set(row.id, row);
+      }
+      setDupes(Array.from(map.values()).slice(0, 5));
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [nameKr, isEdit]);
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -93,7 +143,57 @@ export function BottlingForm({
       </Field>
 
       <Field label="보틀링 이름 (한글)" required hint="예: 맥캘란 18년 셰리오크">
-        <input name="name_kr" required maxLength={200} defaultValue={init?.name_kr ?? ""} className={fieldCls} />
+        <input
+          name="name_kr"
+          required
+          maxLength={200}
+          value={nameKr}
+          onChange={(e) => { setNameKr(e.target.value); setDupeDismissed(false); }}
+          className={fieldCls}
+        />
+        {!isEdit && !dupeDismissed && dupes.length > 0 && (
+          <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-400/5 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-200">
+                <AlertTriangle className="size-3.5" />
+                이미 등록된 위스키가 있어요
+              </div>
+              <button
+                type="button"
+                onClick={() => setDupeDismissed(true)}
+                className="text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                무시
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              중복 등록을 피해주세요. 클릭하면 상세로 이동해요.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {dupes.map((d) => (
+                <li key={d.id}>
+                  <Link
+                    href={`/whiskies/${d.id}`}
+                    target="_blank"
+                    className="flex items-center gap-2 rounded border border-border bg-card/40 px-2.5 py-2 text-xs hover:border-foreground/30"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-muted-foreground truncate">
+                        {COUNTRY_FLAG[d.country]}{" "}
+                        {d.distillery_name_kr ?? d.distillery_name ?? "(증류소 없음)"}
+                      </div>
+                      <div className="mt-0.5 truncate font-medium text-foreground">
+                        {d.name_kr ?? d.name}
+                        {d.age_years !== null ? ` · ${d.age_years}년` : ""}
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">노트 {d.tasting_count}</div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Field>
 
       <Field label="보틀링 이름 (영문)" hint="알면 함께 적어두세요 — 예: Macallan 18 Year Old Sherry Oak">
