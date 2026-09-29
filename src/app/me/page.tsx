@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { COLLECTION_LABEL } from "@/lib/format";
 import { Avatar } from "@/components/avatar";
-import { NotebookPen, Library, Pencil, Rss, Bell, Sparkles, Trash2 } from "lucide-react";
+import { NotebookPen, Library, Pencil, Rss, Bell, Sparkles, Trash2, Mail } from "lucide-react";
 import type { CollectionStatus } from "@/types/database";
 import { loadTasteProfile } from "@/lib/tastings/taste-profile";
 import { TasteProfileChips } from "@/components/social/taste-profile-chips";
@@ -80,6 +80,9 @@ export default async function MePage() {
           </ActionLink>
           <ActionLink href="/me/notifications" icon={<Bell className="size-3.5" />}>
             알림 설정
+          </ActionLink>
+          <ActionLink href="/me/settings/feedback" icon={<Mail className="size-3.5" />}>
+            문의·건의
           </ActionLink>
         </div>
       </header>
