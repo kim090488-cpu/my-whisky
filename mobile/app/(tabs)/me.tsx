@@ -380,6 +380,12 @@ function LoggedIn() {
       {/* 메뉴 리스트 */}
       <View style={styles.menuCard}>
         <MenuItem
+          icon="person-outline"
+          label="프로필 편집"
+          onPress={() => router.push("/settings/profile-edit" as never)}
+        />
+        <MenuDivider />
+        <MenuItem
           icon="camera-outline"
           label="내 모먼트"
           onPress={() => router.push("/posts?mine=1" as never)}
@@ -401,6 +407,12 @@ function LoggedIn() {
           icon="settings-outline"
           label="알림 설정"
           onPress={() => router.push("/notification-settings")}
+        />
+        <MenuDivider />
+        <MenuItem
+          icon="mail-outline"
+          label="문의·건의"
+          onPress={() => router.push("/settings/feedback" as never)}
         />
       </View>
 
